@@ -1044,6 +1044,63 @@ class Library:
         return [dict(r) for r in results]
 
     @classmethod
+    def get_publishers(cls) -> List[dict]:
+        """Get a list of distinct publishers with volume counts.
+
+        Returns:
+            List[dict]: Publishers with their volume counts.
+        """
+        cursor = get_db()
+        results = cursor.execute("""
+            SELECT publisher, COUNT(*) AS volume_count
+            FROM volumes
+            WHERE publisher IS NOT NULL AND publisher != ''
+            GROUP BY publisher
+            ORDER BY publisher
+        """).fetchalldict()
+        return [dict(r) for r in results]
+
+    @classmethod
+    def get_publisher_volumes(
+        cls,
+        publisher: str,
+        query: str = ''
+    ) -> List[dict]:
+        """Get volumes from the library for a given publisher.
+
+        Args:
+            publisher (str): The publisher name.
+            query (str): Optional title search filter.
+
+        Returns:
+            List[dict]: Volumes matching the publisher and query.
+        """
+        cursor = get_db()
+        if query:
+            results = cursor.execute("""
+                SELECT
+                    id, comicvine_id, title, alt_title, year,
+                    publisher, volume_number, description,
+                    site_url, monitored
+                FROM volumes
+                WHERE publisher = ? AND (
+                    title LIKE ? OR alt_title LIKE ?
+                )
+                ORDER BY title, year, volume_number
+            """, (publisher, f'%{query}%', f'%{query}%')).fetchalldict()
+        else:
+            results = cursor.execute("""
+                SELECT
+                    id, comicvine_id, title, alt_title, year,
+                    publisher, volume_number, description,
+                    site_url, monitored
+                FROM volumes
+                WHERE publisher = ?
+                ORDER BY title, year, volume_number
+            """, (publisher,)).fetchalldict()
+        return [dict(r) for r in results]
+
+    @classmethod
     def get_volumes(cls) -> List[int]:
         """Get a list of the IDs of all the volumes.
 

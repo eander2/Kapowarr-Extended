@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% from "base.html" import icon_button, window, loading_window %}
+{% block title %}Publishers{% endblock %}
+{% block css %}
+	<link rel="stylesheet" href="{{ url_for('static', filename='css/window.css') }}">
+	<link rel="stylesheet" href="{{ url_for('static', filename='css/publishers.css') }}">
+{% endblock %}
+{% block js %}
+	<script src="{{ url_for('static', filename='js/window.js') }}" defer></script>
+	<script src="{{ url_for('static', filename='js/publishers.js') }}" defer></script>
+{% endblock %}
+
+{% block pre_build_els %}
+<a href="" class="pub-volume-card" aria-label="">
+	<img class="pub-volume-cover" src="" alt="" loading="lazy">
+	<div class="pub-volume-info">
+		<p class="pub-volume-title"></p>
+		<p class="pub-volume-year"></p>
+		<p class="pub-volume-issues"></p>
+	</div>
+	<span class="pub-volume-badge"></span>
+</a>
+{% endblock %}
+
+{% block windows %}
+	{{ loading_window("pub-loading-window", "Adding volume...") }}
+
+	{% set add_content %}
+		<img src="" id="pub-add-cover" alt="">
+		<form id="pub-add-form">
+			<input type="hidden" id="pub-comicvine-input" value="">
+			<table class="fold-table">
+				<tr>
+					<th><label for="pub-rootfolder-input">Root Folder</label></th>
+					<td>
+						<select id="pub-rootfolder-input">
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th><label for="pub-volumefolder-input">Volume Folder</label></th>
+					<td>
+						<input type="text" id="pub-volumefolder-input">
+					</td>
+				</tr>
+				<tr>
+					<th><label for="pub-monitor-volume-input">Monitor Volume</label></th>
+					<td>
+						<select id="pub-monitor-volume-input">
+							<option value="true" selected>Yes</option>
+							<option value="false">No</option>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th><label for="pub-monitor-issues-input">Monitor New Issues</label></th>
+					<td>
+						<select id="pub-monitor-issues-input">
+							<option value="true" selected>Yes</option>
+							<option value="false">No</option>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th><label for="pub-monitoring-scheme-input">Monitoring Scheme</label></th>
+					<td>
+						<select id="pub-monitoring-scheme-input">
+							<option value="all" selected>All</option>
+							<option value="missing">Missing</option>
+							<option value="none">None</option>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th><label for="pub-specialoverride-input">Special Version</label></th>
+					<td>
+						<select id="pub-specialoverride-input">
+							<option value="auto" selected>Automatic</option>
+							<option value="">Normal Volume</option>
+							<option value="tpb">Trade Paper Back</option>
+							<option value="one-shot">One Shot</option>
+							<option value="hard-cover">Hard Cover</option>
+							<option value="omnibus">Omnibus</option>
+							<option value="volume-as-issue">Volume As Issue</option>
+						</select>
+					</td>
+				</tr>
+			</table>
+		</form>
+	{% endset %}
+
+	{% set add_submit %}
+		<label for="pub-auto-search-input">Start search for missing volume</label>
+		<input type="checkbox" id="pub-auto-search-input">
+		<button id="pub-add-volume" type="submit" form="pub-add-form">Add Volume</button>
+	{% endset %}
+
+	{{ window(False, "pub-add-window", "Add volume", add_content, add_submit, "pub-loading-window", False) }}
+{% endblock windows %}
+
+{% block main %}
+<main class="publishers-layout">
+	<aside id="publisher-panel">
+		<div class="publisher-panel-header">
+			<h2>Publishers</h2>
+			<input type="text" id="publisher-filter" placeholder="Filter publishers..." aria-label="Filter publishers">
+		</div>
+		<div id="loading-publishers" class="loading-screen">
+			<h2>Loading...</h2>
+		</div>
+		<div id="empty-publishers" class="publisher-empty hidden">
+			<p>No publishers in library</p>
+		</div>
+		<ul id="publisher-list" class="hidden"></ul>
+		<div class="publisher-panel-footer">
+			<form id="custom-publisher-form">
+				<input type="text" id="custom-publisher-input" placeholder="Browse any publisher..." aria-label="Browse any publisher">
+				<button type="submit" title="Browse publisher">Go</button>
+			</form>
+		</div>
+	</aside>
+	<section id="volumes-panel">
+		<div id="volumes-placeholder" class="publisher-empty">
+			<p>Select a publisher to browse volumes</p>
+		</div>
+		<div id="volumes-content" class="hidden">
+			<div class="volumes-header">
+				<h2 id="selected-publisher-name"></h2>
+				<form class="pub-search-bar" aria-label="Search within publisher">
+					<button type="submit" title="Search">
+						<img src="{{url_base}}/static/img/search.svg" alt="">
+					</button>
+					<input type="text" id="pub-search-input" placeholder="Search ComicVine..." aria-label="Search within publisher">
+					<button type="button" id="pub-search-clear" title="Clear search">
+						<img src="{{url_base}}/static/img/cancel.svg" alt="">
+					</button>
+				</form>
+			</div>
+			<div id="loading-volumes" class="loading-screen hidden">
+				<h2>Loading...</h2>
+			</div>
+			<div id="empty-volumes" class="publisher-empty hidden">
+				<p>No volumes found</p>
+			</div>
+			<div id="volumes-grid"></div>
+		</div>
+	</section>
+</main>
+{% endblock main %}

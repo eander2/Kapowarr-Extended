@@ -76,6 +76,11 @@ def ui_calendar():
     return render('calendar.html')
 
 
+@ui.route('/publishers', methods=methods)
+def ui_publishers():
+    return render('publishers.html')
+
+
 @ui.route('/activity/queue', methods=methods)
 def ui_queue():
     return render('queue.html')

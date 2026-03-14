@@ -761,6 +761,83 @@ class ComicVine:
 
         return self.__format_search_output(results)
 
+    def search_volumes_by_publisher(
+        self,
+        publisher: str,
+        query: str = ''
+    ) -> List[VolumeMetadata]:
+        """Search ComicVine for volumes filtered by publisher.
+
+        When a query is provided, searches for that query and filters
+        results by publisher. When no query is given, performs multiple
+        searches to gather a broad set of volumes from the publisher.
+
+        Args:
+            publisher (str): The publisher name to filter by.
+            query (str): Optional search query within the publisher.
+
+        Returns:
+            List[VolumeMetadata]: Volumes matching the publisher.
+        """
+        async def _search():
+            seen_ids: set = set()
+            results: List[VolumeMetadata] = []
+
+            async with AsyncSession() as session:
+                if query:
+                    # Search with the query, filter by publisher
+                    search_terms = [query]
+                else:
+                    # Search with the publisher name itself to get
+                    # a broad set of their volumes
+                    search_terms = [publisher]
+
+                for term in search_terms:
+                    # Use /search endpoint with pagination
+                    for offset in (0, 50):
+                        try:
+                            response = await self.__call_api(
+                                session,
+                                '/search',
+                                {
+                                    'query': term,
+                                    'resources': 'volume',
+                                    'limit': 50,
+                                    'offset': offset,
+                                    'field_list': self.search_field_list
+                                },
+                                {'results': []}
+                            )
+                        except CVRateLimitReached:
+                            return results
+
+                        raw_results = response.get('results', [])
+                        if not raw_results:
+                            break
+
+                        formatted = self.__format_search_output(
+                            raw_results
+                        )
+                        for r in formatted:
+                            if (
+                                r.get('publisher') == publisher
+                                and r['comicvine_id'] not in seen_ids
+                            ):
+                                seen_ids.add(r['comicvine_id'])
+                                results.append(r)
+
+                        total = response.get(
+                            'number_of_total_results', 0
+                        )
+                        if offset + 50 >= total:
+                            break
+
+                        await sleep(Constants.CV_BRAKE_TIME)
+
+            return results
+
+        return run(_search())
+
     async def filenames_to_cvs(
         self,
         file_groups: Dict[int, Dict[str, FilenameData]],

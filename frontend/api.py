@@ -757,6 +757,55 @@ def api_get_calendar():
 
 
 # =====================
+# Publishers
+# =====================
+
+
+@api.route('/publishers', methods=['GET'])
+@error_handler
+@auth
+def api_get_publishers():
+    publishers = Library.get_publishers()
+    return return_api(publishers)
+
+
+@api.route('/publishers/volumes', methods=['GET'])
+@error_handler
+@auth
+def api_get_publisher_volumes():
+    publisher = extract_key(request, 'publisher')
+    query = extract_key(request, 'query', check_existence=False) or ''
+
+    # Get library volumes for this publisher
+    library_volumes = Library.get_publisher_volumes(publisher, query)
+    library_cv_ids = {v['comicvine_id'] for v in library_volumes}
+    for vol in library_volumes:
+        vol['in_library'] = True
+
+    # Always search ComicVine for this publisher
+    cv_volumes = []
+    try:
+        cv = ComicVine()
+        cv_volumes = cv.search_volumes_by_publisher(publisher, query)
+    except (InvalidComicVineApiKey, KapowarrException):
+        pass
+
+    for vol in cv_volumes:
+        if vol['comicvine_id'] not in library_cv_ids:
+            del vol['cover']  # type: ignore
+            vol['in_library'] = False
+            vol['id'] = None
+            vol['monitored'] = None
+            library_volumes.append(vol)
+
+    library_volumes.sort(
+        key=lambda v: (v.get('title') or '', v.get('year') or 0)
+    )
+
+    return return_api(library_volumes)
+
+
+# =====================
 # Library + Volumes
 # =====================
 

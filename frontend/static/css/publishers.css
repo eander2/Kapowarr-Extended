@@ -1,0 +1,346 @@
+/* Publishers - Browse by Publisher */
+
+main.publishers-layout {
+	flex-direction: row;
+	overflow: hidden;
+}
+
+main.publishers-layout > * {
+	overflow-y: hidden;
+}
+
+/* Left Panel - Publisher List */
+#publisher-panel {
+	width: 200px;
+	min-width: 120px;
+	max-width: 400px;
+	background-color: var(--foreground-color);
+	border-right: 1px solid var(--border-color);
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	resize: horizontal;
+}
+
+.publisher-panel-header {
+	padding: 16px 12px 12px;
+	border-bottom: 1px solid var(--border-color);
+}
+
+.publisher-panel-header h2 {
+	font-size: 1rem;
+	font-weight: 500;
+	color: var(--text-color);
+	margin-bottom: 8px;
+}
+
+#publisher-filter {
+	width: 100%;
+	padding: 6px 10px;
+	border: 1px solid var(--border-color);
+	border-radius: 4px;
+	background-color: var(--background-color);
+	color: var(--text-color);
+	font-size: 0.85rem;
+	box-sizing: border-box;
+}
+
+#publisher-list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	overflow-y: auto;
+	flex: 1;
+}
+
+#publisher-list li {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 10px 12px;
+	cursor: pointer;
+	border-bottom: 1px solid var(--border-color);
+	transition: background-color 0.15s;
+}
+
+#publisher-list li:hover {
+	background-color: var(--hover-color);
+}
+
+#publisher-list li.active {
+	background-color: var(--accent-color);
+	color: var(--header-color);
+}
+
+#publisher-list li.active .pub-count {
+	background-color: var(--header-color);
+	color: var(--accent-color);
+}
+
+.pub-name {
+	font-size: 0.85rem;
+	font-weight: 400;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	flex: 1;
+	margin-right: 8px;
+}
+
+.pub-count {
+	font-size: 0.75rem;
+	font-weight: 500;
+	background-color: var(--border-color);
+	color: var(--text-color);
+	padding: 2px 8px;
+	border-radius: 12px;
+	flex-shrink: 0;
+}
+
+.publisher-panel-footer {
+	padding: 10px 12px;
+	border-top: 1px solid var(--border-color);
+}
+
+#custom-publisher-form {
+	display: flex;
+	gap: 6px;
+}
+
+#custom-publisher-input {
+	flex: 1;
+	padding: 6px 10px;
+	border: 1px solid var(--border-color);
+	border-radius: 4px;
+	background-color: var(--background-color);
+	color: var(--text-color);
+	font-size: 0.8rem;
+	box-sizing: border-box;
+}
+
+#custom-publisher-form button {
+	padding: 6px 12px;
+	border: 1px solid var(--accent-color);
+	border-radius: 4px;
+	background-color: var(--accent-color);
+	color: var(--header-color);
+	font-size: 0.8rem;
+	font-weight: 500;
+	cursor: pointer;
+}
+
+#custom-publisher-form button:hover {
+	opacity: 0.85;
+}
+
+.publisher-empty {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 40px 20px;
+	color: var(--dimmed-text-color);
+	font-size: 0.9rem;
+	flex: 1;
+}
+
+/* Right Panel - Volume Browser */
+#volumes-panel {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	overflow: hidden;
+}
+
+#volumes-placeholder {
+	flex: 1;
+}
+
+#volumes-content {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	overflow: hidden;
+}
+
+.volumes-header {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	padding: 10px 16px;
+	background-color: var(--foreground-color);
+	border-bottom: 1px solid var(--border-color);
+	flex-shrink: 0;
+}
+
+.volumes-header h2 {
+	font-size: 1.1rem;
+	font-weight: 500;
+	color: var(--text-color);
+	white-space: nowrap;
+}
+
+.pub-search-bar {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex: 1;
+	max-width: 400px;
+	border: 1px solid var(--border-color);
+	border-radius: 4px;
+	padding: 2px 6px;
+	background-color: var(--background-color);
+}
+
+.pub-search-bar button {
+	background: none;
+	border: none;
+	cursor: pointer;
+	padding: 4px;
+	display: flex;
+	align-items: center;
+}
+
+.pub-search-bar button img {
+	width: 16px;
+	height: 16px;
+	filter: var(--icon-filter, none);
+}
+
+.pub-search-bar input {
+	flex: 1;
+	border: none;
+	background: none;
+	color: var(--text-color);
+	font-size: 0.85rem;
+	padding: 4px;
+	outline: none;
+}
+
+/* Volume Grid */
+#volumes-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+	gap: 12px;
+	padding: 12px;
+	overflow-y: auto;
+	flex: 1;
+}
+
+.pub-volume-card {
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--border-color);
+	border-radius: 6px;
+	overflow: hidden;
+	background-color: var(--foreground-color);
+	text-decoration: none;
+	color: var(--text-color);
+	transition: transform 0.15s, box-shadow 0.15s;
+	position: relative;
+}
+
+.pub-volume-card:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.pub-volume-card.in-library {
+	border-color: var(--success-color);
+}
+
+.pub-volume-card.not-in-library {
+	border-color: var(--border-color);
+}
+
+.pub-volume-cover {
+	width: 100%;
+	aspect-ratio: 2/3;
+	object-fit: cover;
+	background-color: var(--background-color);
+}
+
+.pub-volume-info {
+	padding: 6px 8px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.pub-volume-title {
+	font-size: 0.8rem;
+	font-weight: 500;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.pub-volume-year {
+	font-size: 0.75rem;
+	color: var(--dimmed-text-color);
+}
+
+.pub-volume-issues {
+	font-size: 0.7rem;
+	color: var(--dimmed-text-color);
+}
+
+.pub-volume-badge {
+	position: absolute;
+	top: 6px;
+	right: 6px;
+	padding: 2px 6px;
+	border-radius: 3px;
+	font-size: 0.65rem;
+	font-weight: 600;
+	text-transform: uppercase;
+}
+
+.badge-library {
+	background-color: var(--success-color);
+	color: #fff;
+}
+
+.badge-add {
+	background-color: var(--accent-color);
+	color: var(--header-color);
+}
+
+/* Add Volume Window */
+#pub-add-cover {
+	max-width: 150px;
+	border-radius: 4px;
+	margin-bottom: 12px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+	main.publishers-layout {
+		flex-direction: column;
+		overflow: auto;
+	}
+
+	#publisher-panel {
+		width: 100%;
+		min-width: auto;
+		max-height: 250px;
+		border-right: none;
+		border-bottom: 1px solid var(--border-color);
+	}
+
+	.volumes-header {
+		flex-direction: column;
+		align-items: stretch;
+		gap: 8px;
+	}
+
+	.pub-search-bar {
+		max-width: none;
+	}
+
+	#volumes-grid {
+		grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+		gap: 8px;
+		padding: 8px;
+	}
+}
