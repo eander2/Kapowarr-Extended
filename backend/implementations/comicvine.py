@@ -625,6 +625,67 @@ class ComicVine:
 
             return issue_infos
 
+    def fetch_issues_by_date_range(
+        self,
+        start_date: str,
+        end_date: str
+    ) -> List[Dict[str, Any]]:
+        """Fetch issues from ComicVine releasing between two dates.
+
+        Args:
+            start_date (str): Start date in YYYY-MM-DD format.
+            end_date (str): End date in YYYY-MM-DD format.
+
+        Returns:
+            List[Dict[str, Any]]: Issues with volume metadata from ComicVine.
+        """
+        async def _fetch():
+            results = []
+            async with AsyncSession() as session:
+                date_filter = f'{self.date_type}:{start_date}|{end_date}'
+                try:
+                    response = await self.__call_api(
+                        session,
+                        '/issues',
+                        {
+                            'field_list': ','.join((
+                                'id', 'issue_number', 'name',
+                                'cover_date', 'store_date',
+                                'image', 'volume'
+                            )),
+                            'filter': date_filter,
+                            'sort': f'{self.date_type}:asc',
+                            'limit': 100
+                        }
+                    )
+                except CVRateLimitReached:
+                    return results
+
+                for issue in response.get('results', []):
+                    results.append({
+                        'comicvine_id': int(issue['id']),
+                        'issue_number': (
+                            issue.get('issue_number') or '1'
+                        ).replace('/', '-').strip(),
+                        'issue_title': normalise_string(
+                            issue.get('name') or ''
+                        ) or None,
+                        'date': issue.get(self.date_type),
+                        'volume_comicvine_id': int(
+                            issue['volume']['id']
+                        ),
+                        'volume_title': normalise_string(
+                            issue['volume'].get('name') or ''
+                        ),
+                        'cover': (
+                            issue.get('image') or {}
+                        ).get('small_url')
+                    })
+
+            return results
+
+        return run(_fetch())
+
     async def __search_volume(
         self, query: str
     ) -> List[Dict[str, Any]]:

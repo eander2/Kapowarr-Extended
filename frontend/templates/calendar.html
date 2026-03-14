@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% from "base.html" import icon_button, window, loading_window %}
+{% block title %}Calendar{% endblock %}
+{% block css %}
+	<link rel="stylesheet" href="{{ url_for('static', filename='css/window.css') }}">
+	<link rel="stylesheet" href="{{ url_for('static', filename='css/calendar.css') }}">
+{% endblock %}
+{% block js %}
+	<script src="{{ url_for('static', filename='js/window.js') }}" defer></script>
+	<script src="{{ url_for('static', filename='js/calendar.js') }}" defer></script>
+{% endblock %}
+
+{% block pre_build_els %}
+<a href="" class="calendar-issue" aria-label="">
+	<img class="calendar-issue-cover" src="" alt="" loading="lazy">
+	<div class="calendar-issue-info">
+		<p class="calendar-issue-title"></p>
+		<p class="calendar-issue-number"></p>
+	</div>
+</a>
+{% endblock %}
+
+{% block windows %}
+	{{ loading_window("cal-loading-window", "Adding volume...") }}
+
+	{% set add_content %}
+		<img src="" id="cal-add-cover" alt="">
+		<form id="cal-add-form">
+			<input type="hidden" id="cal-comicvine-input" value="">
+			<input type="hidden" id="cal-volume-title-input" value="">
+			<input type="hidden" id="cal-volume-year-input" value="">
+			<input type="hidden" id="cal-volume-number-input" value="">
+			<input type="hidden" id="cal-volume-publisher-input" value="">
+			<table class="fold-table">
+				<tr>
+					<th><label for="cal-rootfolder-input">Root Folder</label></th>
+					<td>
+						<select id="cal-rootfolder-input">
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th><label for="cal-volumefolder-input">Volume Folder</label></th>
+					<td>
+						<input type="text" id="cal-volumefolder-input">
+					</td>
+				</tr>
+				<tr>
+					<th><label for="cal-monitor-volume-input">Monitor Volume</label></th>
+					<td>
+						<select id="cal-monitor-volume-input">
+							<option value="true" selected>Yes</option>
+							<option value="false">No</option>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th><label for="cal-monitor-issues-input">Monitor New Issues</label></th>
+					<td>
+						<select id="cal-monitor-issues-input">
+							<option value="true" selected>Yes</option>
+							<option value="false">No</option>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th><label for="cal-monitoring-scheme-input">Monitoring Scheme</label></th>
+					<td>
+						<select id="cal-monitoring-scheme-input">
+							<option value="all" selected>All</option>
+							<option value="missing">Missing</option>
+							<option value="none">None</option>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th><label for="cal-specialoverride-input">Special Version</label></th>
+					<td>
+						<select id="cal-specialoverride-input">
+							<option value="auto" selected>Automatic</option>
+							<option value="">Normal Volume</option>
+							<option value="tpb">Trade Paper Back</option>
+							<option value="one-shot">One Shot</option>
+							<option value="hard-cover">Hard Cover</option>
+							<option value="omnibus">Omnibus</option>
+							<option value="volume-as-issue">Volume As Issue</option>
+						</select>
+					</td>
+				</tr>
+			</table>
+		</form>
+	{% endset %}
+
+	{% set add_submit %}
+		<label for="cal-auto-search-input">Start search for missing volume</label>
+		<input type="checkbox" id="cal-auto-search-input">
+		<button id="cal-add-volume" type="submit" form="cal-add-form">Add Volume</button>
+	{% endset %}
+
+	{{ window(False, "cal-add-window", "Add volume", add_content, add_submit, "cal-loading-window", False) }}
+{% endblock windows %}
+
+{% block main %}
+<main>
+	<section class="calendar-header" aria-label="Calendar Navigation">
+		<button id="prev-week" title="Previous week">&lt;&lt;</button>
+		<button id="today-button" title="Go to current week">Today</button>
+		<h2 id="week-label"></h2>
+		<button id="next-week" title="Next week">&gt;&gt;</button>
+	</section>
+	<div id="loading-calendar" class="loading-screen">
+		<h2>Loading...</h2>
+	</div>
+	<p id="empty-calendar" class="calendar-empty-msg hidden">No releases this week</p>
+	<section id="calendar-grid" class="hidden" aria-label="Weekly Calendar">
+		<div class="calendar-day" data-day="0">
+			<div class="calendar-day-header">
+				<p class="day-name">Monday</p>
+				<p class="day-date"></p>
+			</div>
+			<div class="day-issues"></div>
+		</div>
+		<div class="calendar-day" data-day="1">
+			<div class="calendar-day-header">
+				<p class="day-name">Tuesday</p>
+				<p class="day-date"></p>
+			</div>
+			<div class="day-issues"></div>
+		</div>
+		<div class="calendar-day" data-day="2">
+			<div class="calendar-day-header">
+				<p class="day-name">Wednesday</p>
+				<p class="day-date"></p>
+			</div>
+			<div class="day-issues"></div>
+		</div>
+		<div class="calendar-day" data-day="3">
+			<div class="calendar-day-header">
+				<p class="day-name">Thursday</p>
+				<p class="day-date"></p>
+			</div>
+			<div class="day-issues"></div>
+		</div>
+		<div class="calendar-day" data-day="4">
+			<div class="calendar-day-header">
+				<p class="day-name">Friday</p>
+				<p class="day-date"></p>
+			</div>
+			<div class="day-issues"></div>
+		</div>
+		<div class="calendar-day" data-day="5">
+			<div class="calendar-day-header">
+				<p class="day-name">Saturday</p>
+				<p class="day-date"></p>
+			</div>
+			<div class="day-issues"></div>
+		</div>
+		<div class="calendar-day" data-day="6">
+			<div class="calendar-day-header">
+				<p class="day-name">Sunday</p>
+				<p class="day-date"></p>
+			</div>
+			<div class="day-issues"></div>
+		</div>
+	</section>
+</main>
+{% endblock main %}

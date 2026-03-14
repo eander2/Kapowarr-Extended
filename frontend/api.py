@@ -7,7 +7,8 @@ from typing import Any, Dict, List, Tuple, Type, Union
 
 from flask import Blueprint, request, send_file
 
-from backend.base.custom_exceptions import (InvalidKeyValue,
+from backend.base.custom_exceptions import (InvalidComicVineApiKey,
+                                            InvalidKeyValue,
                                             KeyNotFound, TaskNotFound)
 from backend.base.definitions import (BlocklistReason, BlocklistReasonID,
                                       CredentialData, CredentialSource,
@@ -710,6 +711,50 @@ def api_library_import():
 
         import_library(data, rename_files)
         return return_api({}, code=201)
+
+# =====================
+# Calendar
+# =====================
+
+
+@api.route('/calendar', methods=['GET'])
+@error_handler
+@auth
+def api_get_calendar():
+    start = extract_key(request, 'start')
+    end = extract_key(request, 'end')
+
+    # Get issues from the user's library
+    library_issues = Library.get_issues_by_date_range(start, end)
+    library_cv_ids = {
+        i['volume_comicvine_id'] for i in library_issues
+    }
+    for issue in library_issues:
+        issue['in_library'] = True
+        issue['cover'] = None
+
+    # Get upcoming releases from ComicVine
+    cv_issues = []
+    try:
+        cv = ComicVine()
+        cv_issues = cv.fetch_issues_by_date_range(start, end)
+    except (InvalidComicVineApiKey, KapowarrException):
+        pass
+
+    # Add CV issues that aren't already in the library
+    for issue in cv_issues:
+        if issue['volume_comicvine_id'] not in library_cv_ids:
+            issue['in_library'] = False
+            issue['volume_id'] = None
+            issue['id'] = None
+            issue['monitored'] = False
+            library_issues.append(issue)
+
+    # Sort all issues by date then title
+    library_issues.sort(key=lambda i: (i.get('date') or '', i.get('volume_title') or ''))
+
+    return return_api(library_issues)
+
 
 # =====================
 # Library + Volumes

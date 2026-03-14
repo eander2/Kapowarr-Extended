@@ -71,6 +71,11 @@ def ui_view_volume(id):
     return render('view_volume.html')
 
 
+@ui.route('/calendar', methods=methods)
+def ui_calendar():
+    return render('calendar.html')
+
+
 @ui.route('/activity/queue', methods=methods)
 def ui_queue():
     return render('queue.html')

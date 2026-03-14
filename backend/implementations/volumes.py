@@ -1015,6 +1015,35 @@ class Library:
         return result
 
     @classmethod
+    def get_issues_by_date_range(
+        cls,
+        start_date: str,
+        end_date: str
+    ) -> List[dict]:
+        """Get issues releasing between start_date and end_date.
+
+        Args:
+            start_date (str): Start date in YYYY-MM-DD format.
+            end_date (str): End date in YYYY-MM-DD format.
+
+        Returns:
+            List[dict]: Issues with their parent volume metadata.
+        """
+        cursor = get_db()
+        results = cursor.execute("""
+            SELECT
+                i.id, i.volume_id, i.comicvine_id AS issue_comicvine_id,
+                i.issue_number, i.title AS issue_title, i.date, i.monitored,
+                v.title AS volume_title, v.year, v.publisher,
+                v.comicvine_id AS volume_comicvine_id
+            FROM issues i
+            INNER JOIN volumes v ON i.volume_id = v.id
+            WHERE i.date BETWEEN ? AND ?
+            ORDER BY i.date, v.title, i.calculated_issue_number
+        """, (start_date, end_date)).fetchalldict()
+        return [dict(r) for r in results]
+
+    @classmethod
     def get_volumes(cls) -> List[int]:
         """Get a list of the IDs of all the volumes.
 
