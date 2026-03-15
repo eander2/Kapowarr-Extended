@@ -147,6 +147,29 @@ function renderScrollView() {
 	}
 };
 
+// Touch swipe navigation
+let touchStartX = 0;
+let touchStartY = 0;
+
+pageView.addEventListener('touchstart', e => {
+	touchStartX = e.changedTouches[0].screenX;
+	touchStartY = e.changedTouches[0].screenY;
+}, { passive: true });
+
+pageView.addEventListener('touchend', e => {
+	const dx = e.changedTouches[0].screenX - touchStartX;
+	const dy = e.changedTouches[0].screenY - touchStartY;
+
+	// Only trigger if horizontal swipe is dominant and > 50px
+	if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+		if (dx < 0) {
+			nextPage();
+		} else {
+			prevPage();
+		}
+	}
+}, { passive: true });
+
 // Back button
 document.querySelector('#reader-back').onclick = () => window.history.back();
 
