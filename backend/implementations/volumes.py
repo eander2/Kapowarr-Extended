@@ -178,10 +178,22 @@ class Issue:
         """
         converted_value = value
 
-        if from_public and key not in ('monitored',):
+        if from_public and key not in (
+            'monitored', 'title', 'date', 'issue_number'
+        ):
             raise KeyNotFound(key)
 
         if key == 'monitored' and not isinstance(converted_value, bool):
+            raise InvalidKeyValue(key, value)
+
+        if key == 'title' and not isinstance(converted_value, str):
+            raise InvalidKeyValue(key, value)
+
+        if key == 'date' and converted_value is not None:
+            if not isinstance(converted_value, str):
+                raise InvalidKeyValue(key, value)
+
+        if key == 'issue_number' and not isinstance(converted_value, str):
             raise InvalidKeyValue(key, value)
 
         return converted_value
@@ -207,6 +219,16 @@ class Issue:
         formatted_data = {}
         for key, value in data.items():
             formatted_data[key] = self.__format_value(key, value, from_public)
+
+        # If issue_number is being updated, recompute calculated_issue_number
+        if 'issue_number' in formatted_data:
+            from backend.base.file_extraction import \
+                _get_calculated_issue_number
+            calc_num = _get_calculated_issue_number(
+                formatted_data['issue_number']
+            )
+            if calc_num is not None:
+                formatted_data['calculated_issue_number'] = calc_num
 
         cursor = get_db()
         for key, value in formatted_data.items():
@@ -1756,6 +1778,82 @@ def delete_issue_file(file_id: int) -> None:
     FilesDB.delete_file(file_id)
 
     return
+
+
+def move_file_to_volume(file_id: int, target_volume_id: int) -> None:
+    """Move a file from its current volume to a different target volume.
+
+    Args:
+        file_id (int): The ID of the file to move.
+        target_volume_id (int): The ID of the target volume.
+    """
+    from os.path import basename, join
+    from shutil import move
+
+    file_data = FilesDB.fetch(file_id=file_id)[0]
+    source_filepath = file_data["filepath"]
+    filename = basename(source_filepath)
+
+    target_volume = Volume(target_volume_id, check_existence=True)
+    target_folder = target_volume.vd.folder
+    create_folder(target_folder)
+
+    new_filepath = join(target_folder, filename)
+    move(source_filepath, new_filepath)
+
+    # Update filepath in DB
+    get_db().execute(
+        "UPDATE files SET filepath = ? WHERE id = ?;",
+        (new_filepath, file_id)
+    )
+
+    # Remove old issue linkages
+    get_db().execute(
+        "DELETE FROM issues_files WHERE file_id = ?;",
+        (file_id,)
+    )
+
+    # Remove old volume_files linkage (general files)
+    get_db().execute(
+        "DELETE FROM volume_files WHERE file_id = ?;",
+        (file_id,)
+    )
+
+    LOGGER.info(
+        f'Moved file {file_id} from {source_filepath} to {new_filepath}'
+    )
+    return
+
+
+def rename_issue_file(file_id: int, new_name: str) -> str:
+    """Rename a file on disk and update the DB.
+
+    Args:
+        file_id (int): The ID of the file to rename.
+        new_name (str): The new filename (basename only).
+
+    Returns:
+        str: The new filepath.
+    """
+    from os.path import basename, dirname, join
+    from os import rename as os_rename
+
+    file_data = FilesDB.fetch(file_id=file_id)[0]
+    old_filepath = file_data["filepath"]
+    folder = dirname(old_filepath)
+    new_filepath = join(folder, new_name)
+
+    os_rename(old_filepath, new_filepath)
+
+    get_db().execute(
+        "UPDATE files SET filepath = ? WHERE id = ?;",
+        (new_filepath, file_id)
+    )
+
+    LOGGER.info(
+        f'Renamed file {file_id} from {basename(old_filepath)} to {new_name}'
+    )
+    return new_filepath
 
 
 # region Comic Reader

@@ -101,14 +101,90 @@ This flows better for ARIA.
 	overflow-x: auto;
 	flex: 1 0 auto;
 	display: flex;
+	flex-direction: column;
 	background-color: var(--background-color);
+	padding: clamp(.3rem, calc(2.1vw * 2), 1.75rem);
+}
+
+/*  */
+/* Issue controls (filter/sort/search) */
+/*  */
+.issues-controls {
+	display: flex;
+	flex-wrap: wrap;
+	gap: .5rem;
+	margin-bottom: .75rem;
+}
+
+.issues-controls input[type="text"] {
+	flex: 1 1 200px;
+	padding: .4rem .6rem;
+	border: 1px solid var(--border-color);
+	border-radius: 4px;
+	background-color: var(--foreground-color);
+	color: var(--text-color);
+	font-size: .85rem;
+}
+
+.issues-controls select {
+	padding: .4rem .6rem;
+	border: 1px solid var(--border-color);
+	border-radius: 4px;
+	background-color: var(--foreground-color);
+	color: var(--text-color);
+	font-size: .85rem;
+}
+
+/*  */
+/* Bulk action bar */
+/*  */
+.bulk-action-bar {
+	display: flex;
+	align-items: center;
+	gap: .75rem;
+	padding: .5rem .75rem;
+	margin-bottom: .5rem;
+	border: 1px solid var(--border-color);
+	border-radius: 4px;
+	background-color: var(--foreground-color);
+	color: var(--text-color);
+	font-size: .85rem;
+}
+
+.bulk-action-bar.hidden {
+	display: none;
+}
+
+.bulk-btn {
+	padding: .3rem .75rem;
+	border: 1px solid var(--border-color);
+	border-radius: 4px;
+	background-color: var(--accent-color);
+	color: var(--nav-background-color);
+	cursor: pointer;
+	font-size: .8rem;
+}
+
+.bulk-btn:hover {
+	opacity: .85;
+}
+
+#bulk-selected-count {
+	margin-right: auto;
+}
+
+.issue-select {
+	width: 2rem;
+}
+
+.issue-select input[type="checkbox"] {
+	width: min-content;
 }
 
 .issues-table {
 	height: min-content;
 	width: 100%;
 	min-width: 485px;
-	margin: clamp(.3rem, calc(2.1vw * 2), 1.75rem);
 
 	border: 2px solid var(--border-color);
 	border-radius: 6px;
@@ -139,7 +215,7 @@ This flows better for ARIA.
 	width: 3rem;
 }
 .action-column {
-	width: 6rem;
+	width: 10rem;
 }
 
 .action-column > :not(:first-child) {
@@ -460,6 +536,39 @@ tbody .issue-title:hover {
 
 :where(.files-entry, .general-files-entry) td button {
     width: 1.5rem;
+}
+
+/*  */
+/* Edit/Delete issue windows */
+/*  */
+#edit-issue-form,
+#delete-issue-form,
+#move-file-form,
+#rename-file-form {
+	width: 100%;
+	max-width: 30rem;
+}
+
+#delete-issue-window .window-content p {
+	text-align: center;
+}
+
+#move-file-target {
+	width: 100%;
+	min-height: 8rem;
+	border: 1px solid var(--border-color);
+	background-color: var(--foreground-color);
+	color: var(--text-color);
+}
+
+:where(.files-entry) td.f-rename,
+:where(.files-entry) td.f-move {
+	width: 4.5rem;
+}
+
+:where(.files-entry) td.f-rename button,
+:where(.files-entry) td.f-move button {
+	width: 1.5rem;
 }
 
 @media (max-width: 520px) {

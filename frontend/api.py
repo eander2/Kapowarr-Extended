@@ -44,8 +44,11 @@ from backend.implementations.naming import (generate_volume_folder_name,
                                             preview_mass_rename)
 from backend.implementations.remote_mapping import RemoteMappings
 from backend.implementations.root_folders import RootFolders
-from backend.implementations.volumes import (Library, delete_issue_file,
-                                              get_comic_page, get_comic_pages)
+from backend.implementations.volumes import (Issue, Library, Volume,
+                                              delete_issue_file,
+                                              get_comic_page, get_comic_pages,
+                                              move_file_to_volume,
+                                              rename_issue_file)
 from backend.internals.db_models import FilesDB
 from backend.internals.server import Server, StartTypeHandlers
 from backend.internals.settings import Settings, get_about_data
@@ -1041,7 +1044,7 @@ def api_volume_cover(id: int):
     ), 200
 
 
-@api.route('/issues/<int:id>', methods=['GET', 'PUT'])
+@api.route('/issues/<int:id>', methods=['GET', 'PUT', 'DELETE'])
 @error_handler
 @auth
 def api_issues(id: int):
@@ -1053,12 +1056,31 @@ def api_issues(id: int):
 
     elif request.method == 'PUT':
         edit_info: dict = request.get_json()
-        monitored = edit_info.get('monitored')
-        if monitored is not None:
-            issue.update({'monitored': monitored})
+        issue.update(edit_info, from_public=True)
 
         result = issue.get_data()
         return return_api(result)
+
+    elif request.method == 'DELETE':
+        delete_files = request.values.get('delete_files', 'false')
+        if delete_files.lower() == 'true':
+            files = issue.get_files()
+            for f in files:
+                delete_issue_file(f['id'])
+        issue.delete()
+        return return_api({})
+
+
+@api.route('/issues/bulk', methods=['PUT'])
+@error_handler
+@auth
+def api_bulk_issues():
+    data = request.get_json()
+    issue_ids = data.get('issue_ids', [])
+    updates = {k: v for k, v in data.items() if k != 'issue_ids'}
+    for issue_id in issue_ids:
+        Issue(issue_id).update(updates, from_public=True)
+    return return_api({})
 
 
 # =====================
@@ -1585,3 +1607,34 @@ def api_files(f_id: int):
     elif request.method == 'DELETE':
         delete_issue_file(f_id)
         return return_api({})
+
+
+@api.route('/files/<int:f_id>/move', methods=['POST'])
+@error_handler
+@auth
+def api_file_move(f_id: int):
+    data = request.get_json()
+    target_volume_id = data.get('target_volume_id')
+    if target_volume_id is None:
+        raise KeyNotFound('target_volume_id')
+    if not isinstance(target_volume_id, int):
+        raise InvalidKeyValue('target_volume_id', target_volume_id)
+    move_file_to_volume(f_id, target_volume_id)
+    return return_api({})
+
+
+@api.route('/files/<int:f_id>/rename', methods=['PUT'])
+@error_handler
+@auth
+def api_file_rename(f_id: int):
+    data = request.get_json()
+    new_name = data.get('new_name')
+    if new_name is None:
+        raise KeyNotFound('new_name')
+    if not isinstance(new_name, str) or not new_name.strip():
+        raise InvalidKeyValue('new_name', new_name)
+    # Basic validation: no path separators allowed
+    if '/' in new_name or '\\' in new_name:
+        raise InvalidKeyValue('new_name', new_name)
+    new_filepath = rename_issue_file(f_id, new_name.strip())
+    return return_api({'filepath': new_filepath})

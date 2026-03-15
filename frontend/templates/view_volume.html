@@ -12,6 +12,9 @@
 
 {% block pre_build_rows %}
 	<tr data-id="" class="issue-entry" aria-label="">
+		<td class="issue-select">
+			<input type="checkbox" class="issue-checkbox">
+		</td>
 		<td class="issue-monitored">
 			<button data-monitored="" data-id="" title=""></button>
 		</td>
@@ -25,6 +28,8 @@
 			{{ icon_button('', "Auto search for this issue", "search.svg") }}
 			{{ icon_button('', "Manually search for this issue", "manual_search.svg") }}
 			{{ icon_button('', "Convert files for this issue", "convert.svg") }}
+			{{ icon_button('', "Edit this issue", "edit.svg") }}
+			{{ icon_button('', "Delete this issue", "delete.svg") }}
 		</td>
 	</tr>
 	<tr class="search-entry">
@@ -74,6 +79,12 @@
             <a class="f-read-link" href="" title="Read this file">
                 <img src="{{url_base}}/static/img/search.svg" alt="Read">
             </a>
+        </td>
+        <td class="f-rename">
+            {{ icon_button('', "Rename", "rename.svg") }}
+        </td>
+        <td class="f-move">
+            {{ icon_button('', "Move to another volume", "manage_files.svg") }}
         </td>
         <td class="f-delete">
             {{ icon_button('', "Delete", "delete.svg") }}
@@ -238,6 +249,9 @@
                 <tr>
                     <th>File</th>
                     <th>Size</th>
+                    <th>Read</th>
+                    <th>Rename</th>
+                    <th>Move</th>
                     <th>Delete</th>
                 </tr>
             </thead>
@@ -245,6 +259,100 @@
         </table>
 	{% endset %}
 	{{ window(False, "issue-info-window", "Issue info", issue_info_content, '') }}
+
+	{% set edit_issue_content %}
+		<form id="edit-issue-form">
+			<input type="hidden" id="edit-issue-id" value="">
+			<table class="fold-table">
+				<tr>
+					<th><label for="edit-issue-title-input">Title</label></th>
+					<td>
+						<input type="text" id="edit-issue-title-input">
+					</td>
+				</tr>
+				<tr>
+					<th><label for="edit-issue-number-input">Issue Number</label></th>
+					<td>
+						<input type="text" id="edit-issue-number-input">
+					</td>
+				</tr>
+				<tr>
+					<th><label for="edit-issue-date-input">Release Date</label></th>
+					<td>
+						<input type="text" id="edit-issue-date-input" placeholder="YYYY-MM-DD">
+					</td>
+				</tr>
+			</table>
+		</form>
+	{% endset %}
+	{% set edit_issue_submit %}
+		<button id="submit-edit-issue" type="submit" form="edit-issue-form">Save</button>
+	{% endset %}
+	{{ window(False, "edit-issue-window", "Edit issue", edit_issue_content, edit_issue_submit) }}
+
+	{% set delete_issue_content %}
+		<p>Are you sure you want to delete this issue?</p>
+		<input type="hidden" id="delete-issue-id" value="">
+		<form id="delete-issue-form">
+			<table class="fold-table">
+				<tr>
+					<th><label for="delete-issue-files-input">Delete files</label></th>
+					<td>
+						<select id="delete-issue-files-input">
+							<option value="true">Yes</option>
+							<option value="false" selected>No</option>
+						</select>
+					</td>
+				</tr>
+			</table>
+		</form>
+	{% endset %}
+	{% set delete_issue_submit %}
+		<button id="submit-delete-issue" type="submit" form="delete-issue-form">Delete</button>
+	{% endset %}
+	{{ window(False, "delete-issue-window", "Delete issue", delete_issue_content, delete_issue_submit) }}
+
+	{% set move_file_content %}
+		<input type="hidden" id="move-file-id" value="">
+		<form id="move-file-form">
+			<table class="fold-table">
+				<tr>
+					<th><label for="move-file-search">Search volume</label></th>
+					<td>
+						<input type="text" id="move-file-search" placeholder="Type to search volumes...">
+					</td>
+				</tr>
+				<tr>
+					<th><label for="move-file-target">Target volume</label></th>
+					<td>
+						<select id="move-file-target" size="6"></select>
+					</td>
+				</tr>
+			</table>
+		</form>
+	{% endset %}
+	{% set move_file_submit %}
+		<button id="submit-move-file" type="submit" form="move-file-form">Move</button>
+	{% endset %}
+	{{ window(False, "move-file-window", "Move file to volume", move_file_content, move_file_submit) }}
+
+	{% set rename_file_content %}
+		<input type="hidden" id="rename-file-id" value="">
+		<form id="rename-file-form">
+			<table class="fold-table">
+				<tr>
+					<th><label for="rename-file-input">New filename</label></th>
+					<td>
+						<input type="text" id="rename-file-input">
+					</td>
+				</tr>
+			</table>
+		</form>
+	{% endset %}
+	{% set rename_file_submit %}
+		<button id="submit-rename-file" type="submit" form="rename-file-form">Rename</button>
+	{% endset %}
+	{{ window(False, "rename-file-window", "Rename file", rename_file_content, rename_file_submit) }}
 
 	{% set convert_content %}
 		<p id="convert-preference"></p>
@@ -430,9 +538,33 @@
 				<section id="volume-description-mobile" class="description" aria-label="Description"></section>
 			</div>
 			<div class="issues-table-container icon-text-color">
+				<div class="issues-controls">
+					<input type="text" id="issue-search-input" placeholder="Filter by number or title...">
+					<select id="issue-sort-select">
+						<option value="number" selected>Sort: Number</option>
+						<option value="title">Sort: Title</option>
+						<option value="date">Sort: Date</option>
+						<option value="status">Sort: Status</option>
+					</select>
+					<select id="issue-filter-select">
+						<option value="all" selected>Show: All</option>
+						<option value="monitored">Show: Monitored</option>
+						<option value="unmonitored">Show: Unmonitored</option>
+						<option value="downloaded">Show: Downloaded</option>
+						<option value="missing">Show: Missing</option>
+					</select>
+				</div>
+				<div id="bulk-action-bar" class="bulk-action-bar hidden">
+					<span id="bulk-selected-count">0 selected</span>
+					<button id="bulk-monitor-btn" class="bulk-btn" title="Monitor selected issues">Monitor</button>
+					<button id="bulk-unmonitor-btn" class="bulk-btn" title="Unmonitor selected issues">Unmonitor</button>
+				</div>
 				<table class="issues-table" aria-label="Issue list">
 					<thead>
 						<tr>
+							<th class="issue-select" aria-label="Select All">
+								<input type="checkbox" id="select-all-issues">
+							</th>
 							<th class="issue-monitored" aria-label="Monitored status"></th>
 							<th class="issue-number" aria-label="Issue number">#</th>
 							<th class="issue-title">Title</th>

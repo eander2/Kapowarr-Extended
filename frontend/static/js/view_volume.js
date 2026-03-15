@@ -41,7 +41,12 @@ const ViewEls = {
 		edit: document.querySelector('#edit-button'),
 		delete: document.querySelector('#delete-button')
 	},
-	issues_list: document.querySelector('#issues-list')
+	issues_list: document.querySelector('#issues-list'),
+	issue_controls: {
+		search: document.querySelector('#issue-search-input'),
+		sort: document.querySelector('#issue-sort-select'),
+		filter: document.querySelector('#issue-filter-select')
+	}
 };
 
 //
@@ -56,6 +61,7 @@ class IssueEntry {
 		else
 			this.entry = ViewEls.issues_list.querySelector(`tr[data-id="${id}"]`);
 
+		this.checkbox = this.entry.querySelector('.issue-checkbox');
 		this.monitored = this.entry.querySelector('.issue-monitored button');
 		this.issue_number = this.entry.querySelector('.issue-number');
 		this.title = this.entry.querySelector('.issue-title');
@@ -64,6 +70,8 @@ class IssueEntry {
 		this.auto_search = this.entry.querySelector('.action-column :nth-child(1)');
 		this.manual_search = this.entry.querySelector('.action-column :nth-child(2)');
 		this.convert = this.entry.querySelector('.action-column :nth-child(3)');
+		this.edit_btn = this.entry.querySelector('.action-column :nth-child(4)');
+		this.delete_btn = this.entry.querySelector('.action-column :nth-child(5)');
 	};
 
 	setMonitorIcon() {
@@ -123,6 +131,9 @@ function fillTable(issues, api_key) {
 		// ARIA
 		inst.entry.ariaLabel = `Issue ${obj.issue_number}`;
 
+		// Checkbox
+		inst.checkbox.onchange = e => updateBulkActionBar();
+
 		// Monitored
 		inst.monitored.dataset.monitored = obj.monitored;
 		inst.monitored.dataset.id = obj.id;
@@ -146,6 +157,8 @@ function fillTable(issues, api_key) {
 		inst.auto_search.onclick = e => autosearchIssue(obj.id, api_key);
 		inst.manual_search.onclick = e => showManualSearch(api_key, obj.id);
 		inst.convert.onclick = e => showConvert(api_key, obj.id);
+		inst.edit_btn.onclick = e => showEditIssue(obj.id, api_key);
+		inst.delete_btn.onclick = e => showDeleteIssue(obj.id, api_key);
 	};
 };
 
@@ -202,7 +215,7 @@ function fillPage(data, api_key) {
 		link.innerText = "link";
 		tags.appendChild(link);
 	};
-	
+
 	// Path
 	const path = ViewEls.vol_data.path;
 	path.innerText = data.folder;
@@ -242,6 +255,120 @@ function fillPage(data, api_key) {
             .then(response => entry.remove());
 
         table.appendChild(entry);
+	});
+};
+
+//
+// Issue table filter & sort
+//
+function filterIssueTable() {
+	const searchVal = ViewEls.issue_controls.search.value.toLowerCase().trim();
+	const filterVal = ViewEls.issue_controls.filter.value;
+
+	const rows = ViewEls.issues_list.querySelectorAll('.issue-entry');
+	rows.forEach(row => {
+		const number = row.querySelector('.issue-number').innerText.toLowerCase();
+		const title = row.querySelector('.issue-title').innerText.toLowerCase();
+		const monitored = row.querySelector('.issue-monitored button').dataset.monitored;
+		const isDownloaded = row.querySelector('.issue-status').classList.contains('success');
+
+		let matchSearch = true;
+		if (searchVal) {
+			matchSearch = number.includes(searchVal) || title.includes(searchVal);
+		}
+
+		let matchFilter = true;
+		if (filterVal === 'monitored') {
+			matchFilter = monitored === 'true';
+		} else if (filterVal === 'unmonitored') {
+			matchFilter = monitored !== 'true';
+		} else if (filterVal === 'downloaded') {
+			matchFilter = isDownloaded;
+		} else if (filterVal === 'missing') {
+			matchFilter = !isDownloaded;
+		}
+
+		row.style.display = (matchSearch && matchFilter) ? '' : 'none';
+	});
+};
+
+function sortIssueTable() {
+	const sortVal = ViewEls.issue_controls.sort.value;
+	const rows = [...ViewEls.issues_list.querySelectorAll('.issue-entry')];
+
+	rows.sort((a, b) => {
+		if (sortVal === 'number') {
+			const numA = parseFloat(a.querySelector('.issue-number').innerText) || 0;
+			const numB = parseFloat(b.querySelector('.issue-number').innerText) || 0;
+			return numA - numB;
+		} else if (sortVal === 'title') {
+			const tA = a.querySelector('.issue-title').innerText.toLowerCase();
+			const tB = b.querySelector('.issue-title').innerText.toLowerCase();
+			return tA.localeCompare(tB);
+		} else if (sortVal === 'date') {
+			const dA = a.querySelector('.issue-date').innerText || '';
+			const dB = b.querySelector('.issue-date').innerText || '';
+			return dA.localeCompare(dB);
+		} else if (sortVal === 'status') {
+			const sA = a.querySelector('.issue-status').classList.contains('success') ? 1 : 0;
+			const sB = b.querySelector('.issue-status').classList.contains('success') ? 1 : 0;
+			return sB - sA;
+		}
+		return 0;
+	});
+
+	rows.forEach(row => ViewEls.issues_list.appendChild(row));
+};
+
+//
+// Bulk selection
+//
+function updateBulkActionBar() {
+	const checked = ViewEls.issues_list.querySelectorAll('.issue-checkbox:checked');
+	const bar = document.querySelector('#bulk-action-bar');
+	const count = document.querySelector('#bulk-selected-count');
+
+	if (checked.length > 0) {
+		bar.classList.remove('hidden');
+		count.innerText = `${checked.length} selected`;
+	} else {
+		bar.classList.add('hidden');
+	}
+};
+
+function toggleSelectAllIssues() {
+	const selectAll = document.querySelector('#select-all-issues');
+	ViewEls.issues_list.querySelectorAll('.issue-checkbox').forEach(
+		cb => { cb.checked = selectAll.checked; }
+	);
+	updateBulkActionBar();
+};
+
+function getSelectedIssueIds() {
+	return [...ViewEls.issues_list.querySelectorAll('.issue-entry:has(.issue-checkbox:checked)')]
+		.map(row => parseInt(row.dataset.id));
+};
+
+function bulkMonitor(api_key, monitored) {
+	const ids = getSelectedIssueIds();
+	if (!ids.length) return;
+
+	sendAPI('PUT', '/issues/bulk', api_key, {}, {
+		issue_ids: ids,
+		monitored: monitored
+	})
+	.then(response => {
+		ids.forEach(id => {
+			const inst = new IssueEntry(id, api_key);
+			inst.monitored.dataset.monitored = monitored;
+			inst.setMonitorIcon();
+		});
+		// Uncheck all
+		document.querySelector('#select-all-issues').checked = false;
+		ViewEls.issues_list.querySelectorAll('.issue-checkbox').forEach(
+			cb => { cb.checked = false; }
+		);
+		updateBulkActionBar();
 	});
 };
 
@@ -769,7 +896,7 @@ function processIssueMatch() {
 
 	if (!selectedIssues.length)
 		return;
-	
+
 	managed_issues.forEach(manageId => {
 		let data;
 		if (selectedIssues[0] == "") {
@@ -789,7 +916,7 @@ function processIssueMatch() {
 				general_file: true,
 				forced_match: true
 			};
-		} 
+		}
 		else {
 			// Issue match
 			data = {
@@ -810,12 +937,12 @@ function processIssueMatch() {
 };
 
 //
-// Editing
+// Editing volume
 //
 function showEdit(api_key) {
 	const volume_root_folder = parseInt(ViewEls.vol_data.path.dataset.root_folder),
 	volume_folder = ViewEls.vol_data.path.dataset.volume_folder;
-	
+
 	fetchAPI('/rootfolder', api_key)
 	.then(json => {
 		ViewEls.vol_edit.root_folder.innerHTML = '';
@@ -844,7 +971,7 @@ function editVolume() {
 		'root_folder': parseInt(ViewEls.vol_edit.root_folder.value),
 		'volume_folder': ViewEls.vol_edit.volume_folder.value
 	};
-	
+
 	if (ViewEls.vol_edit.monitoring_scheme.value !== '')
 		data['monitoring_scheme'] = ViewEls.vol_edit.monitoring_scheme.value;
 
@@ -862,13 +989,13 @@ function editVolume() {
 };
 
 //
-// Deleting
+// Deleting volume
 //
 function deleteVolume() {
 	const downloading_error = document.querySelector('#volume-downloading-error'),
 		tasking_error = document.querySelector('#volume-tasking-error'),
 		delete_folder = document.querySelector('#delete-folder-input').value;
-		
+
 	hide([downloading_error, tasking_error]);
 	usingApiKey()
 	.then(api_key => {
@@ -882,8 +1009,64 @@ function deleteVolume() {
 			else if (j.error === "VolumeDownloadedFor")
 				hide([tasking_error], [downloading_error]);
 			else
-				console.log(j);			
+				console.log(j);
 		}));
+	});
+};
+
+//
+// Edit Issue
+//
+function showEditIssue(issueId, api_key) {
+	fetchAPI(`/issues/${issueId}`, api_key)
+	.then(json => {
+		document.querySelector('#edit-issue-id').value = issueId;
+		document.querySelector('#edit-issue-title-input').value = json.result.title || '';
+		document.querySelector('#edit-issue-number-input').value = json.result.issue_number || '';
+		document.querySelector('#edit-issue-date-input').value = json.result.date || '';
+		showWindow('edit-issue-window');
+	});
+};
+
+function submitEditIssue(api_key) {
+	const issueId = document.querySelector('#edit-issue-id').value;
+	const data = {};
+
+	const title = document.querySelector('#edit-issue-title-input').value;
+	if (title !== '') data.title = title;
+
+	const issueNumber = document.querySelector('#edit-issue-number-input').value;
+	if (issueNumber !== '') data.issue_number = issueNumber;
+
+	const date = document.querySelector('#edit-issue-date-input').value;
+	data.date = date || null;
+
+	sendAPI('PUT', `/issues/${issueId}`, api_key, {}, data)
+	.then(response => {
+		closeWindow();
+		window.location.reload();
+	});
+};
+
+//
+// Delete Issue
+//
+function showDeleteIssue(issueId, api_key) {
+	document.querySelector('#delete-issue-id').value = issueId;
+	document.querySelector('#delete-issue-files-input').value = 'false';
+	showWindow('delete-issue-window');
+};
+
+function submitDeleteIssue(api_key) {
+	const issueId = document.querySelector('#delete-issue-id').value;
+	const deleteFiles = document.querySelector('#delete-issue-files-input').value;
+
+	sendAPI('DELETE', `/issues/${issueId}`, api_key, {delete_files: deleteFiles})
+	.then(response => {
+		closeWindow();
+		// Remove row from table
+		const row = ViewEls.issues_list.querySelector(`tr[data-id="${issueId}"]`);
+		if (row) row.remove();
 	});
 };
 
@@ -910,7 +1093,7 @@ function showIssueInfo(issue_id, api_key) {
             );
             entry.querySelector('.f-filepath').innerText = short_f;
             entry.querySelector('.f-filepath').title = f.filepath;
-            
+
             entry.querySelector('.f-size').innerText = convertSize(f.size);
 
             const readLink = entry.querySelector('.f-read-link');
@@ -921,6 +1104,15 @@ function showIssueInfo(issue_id, api_key) {
                 readLink.style.display = 'none';
             }
 
+            // Rename button
+            entry.querySelector('.f-rename button').onclick = e =>
+                showRenameFile(f.id, f.filepath, api_key);
+
+            // Move button
+            entry.querySelector('.f-move button').onclick = e =>
+                showMoveFile(f.id, api_key);
+
+            // Delete button
             entry.querySelector('.f-delete button').onclick = e =>
                 sendAPI("DELETE", `/files/${f.id}`, api_key)
                 .then(response => entry.remove());
@@ -938,6 +1130,79 @@ function showInfoWindow(window) {
 		)],
 		[document.querySelector(`#${window}`)]
 	);
+};
+
+//
+// Move file to volume
+//
+let moveSearchTimeout = null;
+
+function showMoveFile(fileId, api_key) {
+	document.querySelector('#move-file-id').value = fileId;
+	document.querySelector('#move-file-search').value = '';
+	document.querySelector('#move-file-target').innerHTML = '';
+	showWindow('move-file-window');
+};
+
+function searchVolumesForMove(api_key) {
+	clearTimeout(moveSearchTimeout);
+	moveSearchTimeout = setTimeout(() => {
+		const query = document.querySelector('#move-file-search').value.trim();
+		if (!query) {
+			document.querySelector('#move-file-target').innerHTML = '';
+			return;
+		}
+		fetchAPI('/volumes', api_key, {query: query})
+		.then(json => {
+			const select = document.querySelector('#move-file-target');
+			select.innerHTML = '';
+			json.result.forEach(vol => {
+				if (vol.id === volume_id) return; // Skip current volume
+				const opt = document.createElement('option');
+				opt.value = vol.id;
+				opt.innerText = `${vol.title} (${vol.year || 'N/A'})`;
+				select.appendChild(opt);
+			});
+		});
+	}, 300);
+};
+
+function submitMoveFile(api_key) {
+	const fileId = document.querySelector('#move-file-id').value;
+	const targetId = parseInt(document.querySelector('#move-file-target').value);
+	if (!targetId) return;
+
+	sendAPI('POST', `/files/${fileId}/move`, api_key, {}, {
+		target_volume_id: targetId
+	})
+	.then(response => {
+		closeWindow();
+		window.location.reload();
+	});
+};
+
+//
+// Rename file
+//
+function showRenameFile(fileId, filepath, api_key) {
+	document.querySelector('#rename-file-id').value = fileId;
+	const basename = filepath.split('/').pop().split('\\').pop();
+	document.querySelector('#rename-file-input').value = basename;
+	showWindow('rename-file-window');
+};
+
+function submitRenameFile(api_key) {
+	const fileId = document.querySelector('#rename-file-id').value;
+	const newName = document.querySelector('#rename-file-input').value.trim();
+	if (!newName) return;
+
+	sendAPI('PUT', `/files/${fileId}/rename`, api_key, {}, {
+		new_name: newName
+	})
+	.then(response => {
+		closeWindow();
+		window.location.reload();
+	});
 };
 
 // code run on load
@@ -972,6 +1237,33 @@ usingApiKey()
 
 	document.querySelector('#submit-manage-issues').onclick =
 	e => submitManagedIssues(api_key);
+
+	// Issue table controls
+	ViewEls.issue_controls.search.oninput = e => filterIssueTable();
+	ViewEls.issue_controls.sort.onchange = e => sortIssueTable();
+	ViewEls.issue_controls.filter.onchange = e => filterIssueTable();
+
+	// Bulk actions
+	document.querySelector('#select-all-issues').onchange = e => toggleSelectAllIssues();
+	document.querySelector('#bulk-monitor-btn').onclick = e => bulkMonitor(api_key, true);
+	document.querySelector('#bulk-unmonitor-btn').onclick = e => bulkMonitor(api_key, false);
+
+	// Edit issue
+	document.querySelector('#edit-issue-form').action = 'javascript:void(0)';
+	document.querySelector('#submit-edit-issue').onclick = e => submitEditIssue(api_key);
+
+	// Delete issue
+	document.querySelector('#delete-issue-form').action = 'javascript:void(0)';
+	document.querySelector('#submit-delete-issue').onclick = e => submitDeleteIssue(api_key);
+
+	// Move file
+	document.querySelector('#move-file-search').oninput = e => searchVolumesForMove(api_key);
+	document.querySelector('#move-file-form').action = 'javascript:void(0)';
+	document.querySelector('#submit-move-file').onclick = e => submitMoveFile(api_key);
+
+	// Rename file
+	document.querySelector('#rename-file-form').action = 'javascript:void(0)';
+	document.querySelector('#submit-rename-file').onclick = e => submitRenameFile(api_key);
 
 	socket.on(
 		'downloaded_status',
