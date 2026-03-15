@@ -5,7 +5,7 @@ main.publishers-layout {
 	overflow: hidden;
 }
 
-main.publishers-layout > * {
+main.publishers-layout > #publisher-panel {
 	overflow-y: hidden;
 }
 

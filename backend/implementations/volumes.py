@@ -1080,6 +1080,11 @@ class Library:
         """
         cursor = get_db()
         if query:
+            # Escape LIKE metacharacters
+            escaped = (query
+                .replace('\\', '\\\\')
+                .replace('%', '\\%')
+                .replace('_', '\\_'))
             results = cursor.execute("""
                 SELECT
                     id, comicvine_id, title, alt_title, year,
@@ -1087,10 +1092,10 @@ class Library:
                     site_url, monitored
                 FROM volumes
                 WHERE publisher = ? AND (
-                    title LIKE ? OR alt_title LIKE ?
+                    title LIKE ? ESCAPE '\\' OR alt_title LIKE ? ESCAPE '\\'
                 )
                 ORDER BY title, year, volume_number
-            """, (publisher, f'%{query}%', f'%{query}%')).fetchalldict()
+            """, (publisher, f'%{escaped}%', f'%{escaped}%')).fetchalldict()
         else:
             results = cursor.execute("""
                 SELECT
@@ -1783,7 +1788,26 @@ def _detect_archive_type(filepath: str) -> str:
     elif ext in ('.cbr', '.rar'):
         return 'rar'
 
-    raise InvalidKeyValue('file', filepath)
+    raise InvalidKeyValue('file', 'unsupported format')
+
+
+def _safe_page_name(name: str) -> bool:
+    """Check that an archive entry name has no path traversal."""
+    from os.path import normpath
+    normalized = normpath(name)
+    return (
+        not normalized.startswith('..')
+        and not normalized.startswith('/')
+        and '..' not in normalized.split('/')
+    )
+
+
+def _get_file_path(file_id: int) -> str:
+    """Get the filepath for a file_id, raising on not found."""
+    files = FilesDB.fetch(file_id=file_id)
+    if not files:
+        raise InvalidKeyValue('file_id', str(file_id))
+    return files[0]['filepath']
 
 
 def get_comic_pages(file_id: int) -> List[str]:
@@ -1795,8 +1819,7 @@ def get_comic_pages(file_id: int) -> List[str]:
     Returns:
         List[str]: Sorted list of image filenames.
     """
-    files = FilesDB.fetch(file_id=file_id)
-    filepath = files[0]['filepath']
+    filepath = _get_file_path(file_id)
     archive_type = _detect_archive_type(filepath)
 
     if archive_type == 'zip':
@@ -1810,7 +1833,9 @@ def get_comic_pages(file_id: int) -> List[str]:
 
     pages = sorted(
         n for n in names
-        if _is_image(n) and not n.startswith('__MACOSX')
+        if _is_image(n)
+        and not n.startswith('__MACOSX')
+        and _safe_page_name(n)
     )
     return pages
 
@@ -1828,14 +1853,30 @@ def get_comic_page(file_id: int, page: int) -> Tuple[BytesIO, str]:
     Raises:
         InvalidKeyValue: Page index out of range or unsupported format.
     """
-    pages = get_comic_pages(file_id)
+    filepath = _get_file_path(file_id)
+    archive_type = _detect_archive_type(filepath)
+
+    # Get page list from the same filepath (avoid double DB lookup)
+    if archive_type == 'zip':
+        with ZipFile(filepath, 'r') as zf:
+            names = zf.namelist()
+    elif archive_type == 'rar':
+        result = run_rar(['lb', filepath])
+        names = result.stdout.split('\n')
+    else:
+        raise InvalidKeyValue('file', 'unsupported format')
+
+    pages = sorted(
+        n for n in names
+        if _is_image(n)
+        and not n.startswith('__MACOSX')
+        and _safe_page_name(n)
+    )
+
     if page < 0 or page >= len(pages):
         raise InvalidKeyValue('page', str(page))
 
     page_name = pages[page]
-    files = FilesDB.fetch(file_id=file_id)
-    filepath = files[0]['filepath']
-    archive_type = _detect_archive_type(filepath)
 
     ext = splitext(page_name)[1].lower()
     mimetypes = {
@@ -1853,9 +1894,12 @@ def get_comic_page(file_id: int, page: int) -> Tuple[BytesIO, str]:
     elif archive_type == 'rar':
         with TemporaryDirectory() as tmpdir:
             run_rar(['x', '-o+', filepath, page_name, tmpdir + '/'])
-            extracted = tmpdir + '/' + page_name
+            # Use basename to prevent path traversal in extracted file
+            from os.path import basename, join
+            safe_name = basename(page_name)
+            extracted = join(tmpdir, safe_name)
             with open(extracted, 'rb') as f:
                 data = f.read()
         return BytesIO(data), mimetype
 
-    raise InvalidKeyValue('file', filepath)
+    raise InvalidKeyValue('file', 'unsupported format')

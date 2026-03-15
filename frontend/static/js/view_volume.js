@@ -531,7 +531,7 @@ function loadConvertPreference(api_key) {
 			...json.result.format_preference,
 			'no conversion'
 		].join(' - ');
-		el.innerHTML = pref;
+		el.textContent = pref;
 		el.ariaLabel = `The format preference is the following: ${pref}`
 	});
 };

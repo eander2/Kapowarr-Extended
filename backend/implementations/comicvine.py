@@ -121,11 +121,15 @@ def _clean_description(description: str, short: bool = False) -> str:
         link['target'] = '_blank'
         href: str = first_of_range(link.attrs.get('href', ''))
         href = href.lstrip('.').lstrip('/')
-        link['href'] = href
-        if href and not href.startswith('http'):
+        # Strip dangerous URI schemes
+        if href.lower().startswith(('javascript:', 'data:', 'vbscript:')):
+            link['href'] = '#'
+        elif href and not href.startswith('http'):
             link['href'] = (
                 Constants.CV_SITE_URL + '/' + href
             )
+        else:
+            link['href'] = href
 
     result = str(soup)
     return result
@@ -195,7 +199,7 @@ class ComicVine:
         self,
         session: AsyncSession,
         url_path: str,
-        params: Dict[str, Any] = {},
+        params: Union[Dict[str, Any], None] = None,
         default: Union[T, None] = None
     ) -> Union[Dict[str, Any], T]:
         """Make an API call asynchronously (with error handling).
@@ -230,7 +234,7 @@ class ComicVine:
         try:
             response = await session.get(
                 Constants.CV_API_URL + url_path,
-                params={**self._params, **params}
+                params={**self._params, **(params or {})}
             )
             result: Dict[str, Any] = await response.json()
 
@@ -643,44 +647,59 @@ class ComicVine:
             results = []
             async with AsyncSession() as session:
                 date_filter = f'{self.date_type}:{start_date}|{end_date}'
-                try:
-                    response = await self.__call_api(
-                        session,
-                        '/issues',
-                        {
-                            'field_list': ','.join((
-                                'id', 'issue_number', 'name',
-                                'cover_date', 'store_date',
-                                'image', 'volume'
-                            )),
-                            'filter': date_filter,
-                            'sort': f'{self.date_type}:asc',
-                            'limit': 100
-                        }
-                    )
-                except CVRateLimitReached:
-                    return results
+                offset = 0
+                limit = 100
+                while True:
+                    try:
+                        response = await self.__call_api(
+                            session,
+                            '/issues',
+                            {
+                                'field_list': ','.join((
+                                    'id', 'issue_number', 'name',
+                                    'cover_date', 'store_date',
+                                    'image', 'volume'
+                                )),
+                                'filter': date_filter,
+                                'sort': f'{self.date_type}:asc',
+                                'limit': limit,
+                                'offset': offset
+                            }
+                        )
+                    except CVRateLimitReached:
+                        break
 
-                for issue in response.get('results', []):
-                    results.append({
-                        'comicvine_id': int(issue['id']),
-                        'issue_number': (
-                            issue.get('issue_number') or '1'
-                        ).replace('/', '-').strip(),
-                        'issue_title': normalise_string(
-                            issue.get('name') or ''
-                        ) or None,
-                        'date': issue.get(self.date_type),
-                        'volume_comicvine_id': int(
-                            issue['volume']['id']
-                        ),
-                        'volume_title': normalise_string(
-                            issue['volume'].get('name') or ''
-                        ),
-                        'cover': (
-                            issue.get('image') or {}
-                        ).get('small_url')
-                    })
+                    batch = response.get('results', [])
+                    if not batch:
+                        break
+
+                    for issue in batch:
+                        results.append({
+                            'comicvine_id': int(issue['id']),
+                            'issue_number': (
+                                issue.get('issue_number') or '1'
+                            ).replace('/', '-').strip(),
+                            'issue_title': normalise_string(
+                                issue.get('name') or ''
+                            ) or None,
+                            'date': issue.get(self.date_type),
+                            'volume_comicvine_id': int(
+                                issue['volume']['id']
+                            ),
+                            'volume_title': normalise_string(
+                                issue['volume'].get('name') or ''
+                            ),
+                            'cover': (
+                                issue.get('image') or {}
+                            ).get('small_url')
+                        })
+
+                    total = response.get(
+                        'number_of_total_results', 0
+                    )
+                    offset += limit
+                    if offset >= total or len(batch) < limit:
+                        break
 
             return results
 

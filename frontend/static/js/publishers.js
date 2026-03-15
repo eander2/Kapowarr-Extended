@@ -233,6 +233,10 @@ function showAddVolumeWindow(cvId, title, coverUrl) {
 	pubAddEls.monitor_issues_input.value = prefs.monitor_new_issues;
 	pubAddEls.monitoring_scheme.value = prefs.monitoring_scheme;
 
+	// Disable submit until folder name is generated
+	pubAddEls.submit.disabled = true;
+	pubAddEls.submit.innerText = 'Loading...';
+
 	usingApiKey()
 	.then(api_key =>
 		fetchAPI('/volumes/search', api_key, { query: `cv:${cvId}` })
@@ -259,6 +263,10 @@ function showAddVolumeWindow(cvId, title, coverUrl) {
 			generatedFolderName = json.result.folder;
 			pubAddEls.volume_folder_input.value = generatedFolderName;
 		}
+	})
+	.finally(() => {
+		pubAddEls.submit.disabled = false;
+		pubAddEls.submit.innerText = 'Add Volume';
 	});
 
 	showWindow('pub-add-window');

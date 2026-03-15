@@ -722,8 +722,12 @@ def api_library_import():
 @error_handler
 @auth
 def api_get_calendar():
+    from re import fullmatch
     start = extract_key(request, 'start')
     end = extract_key(request, 'end')
+    if (not fullmatch(r'\d{4}-\d{2}-\d{2}', start)
+            or not fullmatch(r'\d{4}-\d{2}-\d{2}', end)):
+        raise InvalidKeyValue('start/end', 'expected YYYY-MM-DD format')
 
     # Get issues from the user's library
     library_issues = Library.get_issues_by_date_range(start, end)

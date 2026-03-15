@@ -89,6 +89,10 @@ function showAddVolumeWindow(volumeCvId, volumeTitle, coverUrl) {
 	// Reset submit button text
 	calAddEls.submit.innerText = 'Add Volume';
 
+	// Disable submit until folder name is generated
+	calAddEls.submit.disabled = true;
+	calAddEls.submit.innerText = 'Loading...';
+
 	// Fetch full volume info from CV to generate folder name
 	usingApiKey()
 	.then(api_key => {
@@ -124,6 +128,10 @@ function showAddVolumeWindow(volumeCvId, volumeTitle, coverUrl) {
 			generatedFolderName = json.result.folder;
 			calAddEls.volume_folder_input.value = generatedFolderName;
 		}
+	})
+	.finally(() => {
+		calAddEls.submit.disabled = false;
+		calAddEls.submit.innerText = 'Add Volume';
 	});
 
 	showWindow('cal-add-window');
