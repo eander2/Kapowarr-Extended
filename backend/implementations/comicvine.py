@@ -5,6 +5,7 @@ Search for volumes/issues and fetch metadata for them on ComicVine
 """
 
 from asyncio import gather, run, sleep
+from datetime import datetime
 from json import JSONDecodeError
 from re import IGNORECASE, compile
 from typing import Any, AsyncGenerator, Dict, Iterable, List, Sequence, Union
@@ -636,6 +637,13 @@ class ComicVine:
     ) -> List[Dict[str, Any]]:
         """Fetch issues from ComicVine releasing between two dates.
 
+        Queries ComicVine using both ``cover_date`` and ``store_date`` filters
+        in parallel. Each issue's effective date is ``store_date`` when set,
+        otherwise ``cover_date``. Issues whose effective date falls outside
+        ``[start_date, end_date]`` are dropped — this filters out comics that
+        are cover-dated within the window but actually shipped weeks earlier
+        (the ~2-month US monthly cover-date offset).
+
         Args:
             start_date (str): Start date in YYYY-MM-DD format.
             end_date (str): End date in YYYY-MM-DD format.
@@ -643,68 +651,105 @@ class ComicVine:
         Returns:
             List[Dict[str, Any]]: Issues with volume metadata from ComicVine.
         """
-        async def _fetch():
-            results = []
-            seen_ids: set = set()
-            async with AsyncSession() as session:
-                date_filter = f'{self.date_type}:{start_date}|{end_date}'
-                offset = 0
-                limit = 100
-                while True:
-                    try:
-                        response = await self.__call_api(
-                            session,
-                            '/issues',
-                            {
-                                'field_list': ','.join((
-                                    'id', 'issue_number', 'name',
-                                    'cover_date', 'store_date',
-                                    'image', 'volume'
-                                )),
-                                'filter': date_filter,
-                                'sort': f'{self.date_type}:asc',
-                                'limit': limit,
-                                'offset': offset
-                            }
-                        )
-                    except CVRateLimitReached:
-                        break
-
-                    batch = response.get('results', [])
-                    if not batch:
-                        break
-
-                    for issue in batch:
-                        issue_id = int(issue['id'])
-                        if issue_id in seen_ids:
-                            continue
-                        seen_ids.add(issue_id)
-                        results.append({
-                            'comicvine_id': issue_id,
-                            'issue_number': (
-                                issue.get('issue_number') or '1'
-                            ).replace('/', '-').strip(),
-                            'issue_title': normalise_string(
-                                issue.get('name') or ''
-                            ) or None,
-                            'date': issue.get(self.date_type),
-                            'volume_comicvine_id': int(
-                                issue['volume']['id']
-                            ),
-                            'volume_title': normalise_string(
-                                issue['volume'].get('name') or ''
-                            ),
-                            'cover': (
-                                issue.get('image') or {}
-                            ).get('small_url')
-                        })
-
-                    total = response.get(
-                        'number_of_total_results', 0
+        async def _fetch_filter(
+            session: AsyncSession, date_field: str
+        ) -> List[Dict[str, Any]]:
+            collected: List[Dict[str, Any]] = []
+            offset = 0
+            limit = 100
+            while True:
+                try:
+                    response = await self.__call_api(
+                        session,
+                        '/issues',
+                        {
+                            'field_list': ','.join((
+                                'id', 'issue_number', 'name',
+                                'cover_date', 'store_date',
+                                'image', 'volume'
+                            )),
+                            'filter': f'{date_field}:{start_date}|{end_date}',
+                            'sort': f'{date_field}:asc',
+                            'limit': limit,
+                            'offset': offset
+                        }
                     )
-                    offset += limit
-                    if offset >= total or len(batch) < limit:
-                        break
+                except CVRateLimitReached:
+                    LOGGER.warning(
+                        'ComicVine rate limit hit fetching issues by %s for '
+                        '%s..%s at offset %d — returning %d partial results '
+                        '(calendar/upcoming releases will be incomplete '
+                        'until limit resets)',
+                        date_field, start_date, end_date,
+                        offset, len(collected)
+                    )
+                    break
+
+                batch = response.get('results', [])
+                if not batch:
+                    break
+                collected.extend(batch)
+
+                total = response.get('number_of_total_results', 0)
+                offset += limit
+                if offset >= total or len(batch) < limit:
+                    break
+            return collected
+
+        async def _fetch():
+            async with AsyncSession() as session:
+                cover_batch, store_batch = await gather(
+                    _fetch_filter(session, 'cover_date'),
+                    _fetch_filter(session, 'store_date'),
+                )
+
+            # For past/current windows store_date is the source of truth
+            # (it tells us when a comic actually shipped). For future windows
+            # ComicVine usually has no store_date populated yet, so cover_date
+            # is the only signal of "what's coming" — preferring store_date
+            # there would drop genuine upcoming releases whose CV record
+            # carries a stale shipped-already store_date.
+            today = datetime.now().strftime('%Y-%m-%d')
+            window_in_future = start_date > today
+
+            results: List[Dict[str, Any]] = []
+            seen_ids: set = set()
+            for issue in (*store_batch, *cover_batch):
+                issue_id = int(issue['id'])
+                if issue_id in seen_ids:
+                    continue
+                seen_ids.add(issue_id)
+
+                sd = issue.get('store_date')
+                cd = issue.get('cover_date')
+                if window_in_future:
+                    effective_date = cd or sd
+                else:
+                    effective_date = sd or cd
+                if not effective_date:
+                    continue
+                if not (start_date <= effective_date <= end_date):
+                    continue
+
+                results.append({
+                    'comicvine_id': issue_id,
+                    'issue_number': (
+                        issue.get('issue_number') or '1'
+                    ).replace('/', '-').strip(),
+                    'issue_title': normalise_string(
+                        issue.get('name') or ''
+                    ) or None,
+                    'date': effective_date,
+                    'volume_comicvine_id': int(
+                        issue['volume']['id']
+                    ),
+                    'volume_title': normalise_string(
+                        issue['volume'].get('name') or ''
+                    ),
+                    'cover': (
+                        issue.get('image') or {}
+                    ).get('small_url')
+                })
 
             return results
 

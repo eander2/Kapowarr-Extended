@@ -98,6 +98,12 @@
 	{% endset %}
 
 	{{ window(False, "cal-add-window", "Add volume", add_content, add_submit, "cal-loading-window", False) }}
+
+	{% set day_content %}
+		<div id="cal-day-issues-grid"></div>
+	{% endset %}
+
+	{{ window(True, "cal-day-window", "Releases", day_content, "", "", True) }}
 {% endblock windows %}
 
 {% block main %}
@@ -111,7 +117,10 @@
 	<div id="loading-calendar" class="loading-screen">
 		<h2>Loading...</h2>
 	</div>
-	<p id="empty-calendar" class="calendar-empty-msg hidden">No releases this week</p>
+	<p id="empty-calendar" class="calendar-empty-msg hidden">
+			No releases this week.<br>
+			ComicVine often doesn't have confirmed dates for upcoming weeks until closer to release — try a week further out or check back later.
+		</p>
 	<section id="calendar-grid" class="hidden" aria-label="Weekly Calendar">
 		<div class="calendar-day" data-day="0">
 			<div class="calendar-day-header">

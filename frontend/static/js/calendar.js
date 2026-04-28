@@ -220,10 +220,85 @@ function clearIssues() {
 	);
 };
 
+// Per-day cache so the "View all" modal can re-render without another fetch.
+const dayIssuesByDate = new Map();
+const dayModalGrid = document.querySelector('#cal-day-issues-grid');
+const dayModalTitle = document.querySelector('#cal-day-window .window-header h2');
+
+function createIssueEntry(issue, api_key) {
+	const entry = issueTemplate.cloneNode(true);
+
+	if (issue.in_library && issue.volume_id) {
+		entry.href = `${url_base}/volumes/${issue.volume_id}`;
+		entry.classList.add('in-library');
+		if (issue.monitored) {
+			entry.classList.add('monitored');
+		}
+	} else {
+		entry.href = '#';
+		entry.classList.add('not-in-library');
+		entry.onclick = e => {
+			e.preventDefault();
+			showAddVolumeWindow(
+				issue.volume_comicvine_id,
+				issue.volume_title,
+				issue.cover
+			);
+		};
+	}
+
+	entry.setAttribute('aria-label',
+		`${issue.volume_title} #${issue.issue_number}`
+	);
+
+	const cover = entry.querySelector('.calendar-issue-cover');
+	if (issue.in_library && issue.volume_id) {
+		cover.src = `${url_base}/api/volumes/${issue.volume_id}/cover?api_key=${api_key}`;
+	} else if (issue.cover) {
+		cover.src = issue.cover;
+	}
+	cover.alt = issue.volume_title;
+
+	entry.querySelector('.calendar-issue-title').textContent =
+		issue.volume_title;
+
+	let issueLabel = `#${issue.issue_number}`;
+	if (issue.issue_title) {
+		issueLabel += ` - ${issue.issue_title}`;
+	}
+	entry.querySelector('.calendar-issue-number').textContent = issueLabel;
+
+	return entry;
+};
+
+function showAllIssuesForDay(dateStr) {
+	const issues = dayIssuesByDate.get(dateStr) || [];
+	const api_key = getLocalStorage('api_key').api_key;
+
+	const dayEl = calendarGrid.querySelector(
+		`.calendar-day[data-date="${dateStr}"]`
+	);
+	const dayName = dayEl
+		? dayEl.querySelector('.day-name').textContent
+		: '';
+	const dayDate = dayEl
+		? dayEl.querySelector('.day-date').textContent
+		: dateStr;
+	dayModalTitle.textContent =
+		`${dayName} ${dayDate} — ${issues.length} releases`;
+
+	dayModalGrid.innerHTML = '';
+	issues.forEach(issue => {
+		dayModalGrid.appendChild(createIssueEntry(issue, api_key));
+	});
+
+	showWindow('cal-day-window');
+};
+
 function renderIssues(issues) {
 	clearIssues();
+	dayIssuesByDate.clear();
 
-	// Always show the grid
 	hide([loadingEl], [calendarGrid]);
 
 	if (issues.length === 0) {
@@ -240,63 +315,44 @@ function renderIssues(issues) {
 		);
 		if (!dayEl) return;
 
-		const entry = issueTemplate.cloneNode(true);
-
-		if (issue.in_library && issue.volume_id) {
-			// Library issue — link to volume page
-			entry.href = `${url_base}/volumes/${issue.volume_id}`;
-			entry.classList.add('in-library');
-			if (issue.monitored) {
-				entry.classList.add('monitored');
-			}
-		} else {
-			// Non-library issue — open add volume window
-			entry.href = '#';
-			entry.classList.add('not-in-library');
-			entry.onclick = e => {
-				e.preventDefault();
-				showAddVolumeWindow(
-					issue.volume_comicvine_id,
-					issue.volume_title,
-					issue.cover
-				);
-			};
+		if (!dayIssuesByDate.has(issue.date)) {
+			dayIssuesByDate.set(issue.date, []);
 		}
+		dayIssuesByDate.get(issue.date).push(issue);
 
-		entry.setAttribute('aria-label',
-			`${issue.volume_title} #${issue.issue_number}`
+		dayEl.querySelector('.day-issues').appendChild(
+			createIssueEntry(issue, api_key)
 		);
-
-		// Set cover image
-		const cover = entry.querySelector('.calendar-issue-cover');
-		if (issue.in_library && issue.volume_id) {
-			cover.src = `${url_base}/api/volumes/${issue.volume_id}/cover?api_key=${api_key}`;
-		} else if (issue.cover) {
-			cover.src = issue.cover;
-		}
-		cover.alt = issue.volume_title;
-
-		// Title
-		entry.querySelector('.calendar-issue-title').textContent =
-			issue.volume_title;
-
-		// Issue number + title
-		let issueLabel = `#${issue.issue_number}`;
-		if (issue.issue_title) {
-			issueLabel += ` - ${issue.issue_title}`;
-		}
-		entry.querySelector('.calendar-issue-number').textContent = issueLabel;
-
-		dayEl.querySelector('.day-issues').appendChild(entry);
 	});
 
-	// Mark empty days for mobile hiding
+	// Mark empty days for mobile hiding; switch dense days to compact rows
+	// so monthly cover-date pile-ups (often >100 entries on day 1) can be
+	// skimmed by scrolling the page instead of micro-scrolling one cell.
+	// Dense days also get a "View all N" button that opens a modal with
+	// the full set rendered as cards with covers.
+	const COMPACT_THRESHOLD = 8;
 	calendarGrid.querySelectorAll('.calendar-day').forEach(dayEl => {
-		const issues = dayEl.querySelector('.day-issues');
-		if (!issues || issues.children.length === 0) {
+		const dateStr = dayEl.dataset.date;
+		const container = dayEl.querySelector('.day-issues');
+		const count = container ? container.children.length : 0;
+
+		if (count === 0) {
 			dayEl.classList.add('empty-day');
-		} else {
-			dayEl.classList.remove('empty-day');
+			container && container.classList.remove('compact');
+			return;
+		}
+
+		dayEl.classList.remove('empty-day');
+		const isDense = count > COMPACT_THRESHOLD;
+		container.classList.toggle('compact', isDense);
+
+		if (isDense) {
+			const btn = document.createElement('button');
+			btn.type = 'button';
+			btn.className = 'view-all-day';
+			btn.textContent = `View all ${count} →`;
+			btn.onclick = () => showAllIssuesForDay(dateStr);
+			container.insertBefore(btn, container.firstChild);
 		}
 	});
 };

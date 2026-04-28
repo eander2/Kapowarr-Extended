@@ -1,6 +1,6 @@
 /* Calendar - Weekly Release View */
 
-.calendar-header {
+main > .calendar-header {
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -8,6 +8,8 @@
 	padding: 16px 20px;
 	background-color: var(--foreground-color);
 	border-bottom: 1px solid var(--border-color);
+	flex: none;
+	overflow: visible;
 }
 
 .calendar-header h2 {
@@ -54,15 +56,16 @@
 #calendar-grid {
 	display: grid;
 	grid-template-columns: repeat(7, 1fr);
+	grid-template-rows: minmax(100%, max-content);
 	gap: 1px;
 	background-color: var(--border-color);
-	min-height: calc(100vh - 140px);
 }
 
 .calendar-day {
 	background-color: var(--foreground-color);
 	display: flex;
 	flex-direction: column;
+	min-height: 200px;
 }
 
 .calendar-day.today {
@@ -104,7 +107,42 @@
 	flex-direction: column;
 	gap: 6px;
 	flex: 1;
-	overflow-y: auto;
+}
+
+/* Compact rows for dense days (e.g. monthly cover-date pile-ups).
+   Hides covers, switches to single-line title + issue # so users can
+   skim the full list without micro-scrolling inside one cell. */
+.day-issues.compact {
+	gap: 2px;
+}
+
+.day-issues.compact .calendar-issue {
+	padding: 4px 6px;
+	gap: 6px;
+	align-items: baseline;
+}
+
+.day-issues.compact .calendar-issue-cover {
+	display: none;
+}
+
+.day-issues.compact .calendar-issue-info {
+	flex-direction: row;
+	align-items: baseline;
+	gap: 8px;
+	width: 100%;
+	overflow: hidden;
+}
+
+.day-issues.compact .calendar-issue-title {
+	flex: 1;
+	font-size: 0.78rem;
+}
+
+.day-issues.compact .calendar-issue-number {
+	margin-top: 0;
+	flex-shrink: 0;
+	font-size: 0.72rem;
 }
 
 /* Issue Entry */
@@ -172,6 +210,65 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 	margin-top: 2px;
+}
+
+/* "View all N" button on dense days — opens the day-modal with full covers */
+.view-all-day {
+	padding: 4px 8px;
+	background-color: var(--accent-color);
+	border: 1px solid var(--border-color);
+	border-radius: 4px;
+	color: var(--header-color);
+	font-size: 0.75rem;
+	font-weight: 600;
+	cursor: pointer;
+	text-align: center;
+}
+
+.view-all-day:hover {
+	background-color: var(--hover-color);
+}
+
+/* Day-modal: grid of full-cover issue cards. The shared .window-content
+   rule centers its children vertically, which clips the top row when the
+   grid overflows — anchor to the top instead. */
+#cal-day-window .window-content {
+	justify-content: flex-start;
+}
+
+#cal-day-issues-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+	gap: 10px;
+	padding: 4px;
+}
+
+#cal-day-issues-grid .calendar-issue {
+	flex-direction: column;
+	align-items: stretch;
+	padding: 8px;
+	gap: 6px;
+}
+
+#cal-day-issues-grid .calendar-issue-cover {
+	width: 100%;
+	height: auto;
+	max-height: 240px;
+	object-fit: contain;
+}
+
+#cal-day-issues-grid .calendar-issue-info {
+	flex-direction: column;
+	gap: 2px;
+	overflow: hidden;
+}
+
+#cal-day-issues-grid .calendar-issue-title {
+	font-size: 0.85rem;
+	white-space: normal;
+	-webkit-line-clamp: 2;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
 }
 
 /* Add Volume Window */

@@ -746,25 +746,31 @@ def api_get_calendar():
     try:
         cv = ComicVine()
         cv_issues = cv.fetch_issues_by_date_range(start, end)
-    except (InvalidComicVineApiKey, KapowarrException):
-        pass
+    except InvalidComicVineApiKey:
+        LOGGER.info('Calendar: skipping ComicVine fetch, no valid API key set')
+    except KapowarrException as e:
+        LOGGER.warning(
+            'Calendar: ComicVine fetch failed (%s: %s) — '
+            'showing library data only',
+            type(e).__name__, e
+        )
 
-    # Add CV issues that aren't already in the library
-    # Deduplicate by issue comicvine_id
+    # Add CV issues that aren't already in the library, deduped by issue id
+    # only — a tracked volume may have new CV issues not yet in the local DB.
     seen_issue_ids = {
         i.get('issue_comicvine_id') or i.get('comicvine_id')
         for i in library_issues
     }
     for issue in cv_issues:
         issue_cv_id = issue.get('comicvine_id')
-        if (issue['volume_comicvine_id'] not in library_cv_ids
-                and issue_cv_id not in seen_issue_ids):
-            seen_issue_ids.add(issue_cv_id)
-            issue['in_library'] = False
-            issue['volume_id'] = None
-            issue['id'] = None
-            issue['monitored'] = False
-            library_issues.append(issue)
+        if issue_cv_id in seen_issue_ids:
+            continue
+        seen_issue_ids.add(issue_cv_id)
+        issue['in_library'] = issue['volume_comicvine_id'] in library_cv_ids
+        issue['volume_id'] = None
+        issue['id'] = None
+        issue['monitored'] = False
+        library_issues.append(issue)
 
     # Sort all issues by date then title
     library_issues.sort(key=lambda i: (i.get('date') or '', i.get('volume_title') or ''))
