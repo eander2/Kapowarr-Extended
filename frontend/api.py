@@ -923,6 +923,16 @@ def api_get_new_releases():
     if not fullmatch(r'\d{4}-\d{2}-\d{2}', week):
         raise InvalidKeyValue('week', 'expected YYYY-MM-DD format')
 
+    settings = Settings().get_settings()
+    if not getattr(settings, 'locg_enabled', False):
+        return return_api({
+            'releases': [],
+            'stale': False,
+            'fetched_at': 0,
+            'disabled': True,
+            'week': week,
+        })
+
     include_variants = (
         extract_key(request, 'include_variants', check_existence=False)
         in ('1', 'true', 'True')
@@ -936,9 +946,9 @@ def api_get_new_releases():
         request, 'publisher', check_existence=False
     )
 
-    releases = []
+    fetched = {'releases': [], 'stale': False, 'fetched_at': 0}
     try:
-        releases = LeagueOfComicGeeks().fetch_new_releases(
+        fetched = LeagueOfComicGeeks().fetch_new_releases(
             week, include_variants=include_variants
         )
     except KapowarrException as e:
@@ -947,6 +957,8 @@ def api_get_new_releases():
             'returning empty list',
             type(e).__name__, e
         )
+
+    releases = fetched.get('releases', [])
 
     if publisher_filter:
         norm_filter = _normalize_for_match(publisher_filter)
@@ -968,7 +980,13 @@ def api_get_new_releases():
         key=lambda r: (not r.get('in_library'), -(r.get('pulls') or 0))
     )
 
-    return return_api(releases)
+    return return_api({
+        'releases': releases,
+        'stale': fetched.get('stale', False),
+        'fetched_at': fetched.get('fetched_at', 0),
+        'disabled': False,
+        'week': week,
+    })
 
 
 # =====================

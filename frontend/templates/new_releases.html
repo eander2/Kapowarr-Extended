@@ -43,6 +43,13 @@
 	<div id="loading-releases" class="loading-screen">
 		<h2>Loading...</h2>
 	</div>
+	<p id="disabled-releases" class="releases-empty-msg hidden">
+		The New Releases page is disabled.<br>
+		It uses
+		<a href="https://leagueofcomicgeeks.com" target="_blank" rel="noopener">League of Comic Geeks</a>,
+		a third-party site with no public API. Enable it under
+		<a href="" id="locg-settings-link">Settings → Metadata</a>.
+	</p>
 	<p id="empty-releases" class="releases-empty-msg hidden">
 		No releases for this week.<br>
 		League of Comic Geeks data is sourced from retailers and the community,
@@ -50,6 +57,10 @@
 	</p>
 	<p id="no-match-releases" class="releases-empty-msg hidden">
 		No releases match your filters.
+	</p>
+	<p id="stale-banner" class="releases-stale-banner hidden">
+		Live League of Comic Geeks fetch failed — showing cached data from
+		<span id="stale-fetched-at"></span>. Will retry on next reload.
 	</p>
 	<section id="releases-grid" class="hidden" aria-label="New releases grid"></section>
 	<p id="releases-meta" class="releases-meta hidden"></p>

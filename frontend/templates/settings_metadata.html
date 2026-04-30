@@ -30,6 +30,28 @@
 					</td>
 				</tr>
 			</table>
+
+			<h2>New Releases (League of Comic Geeks)</h2>
+			<table class="fold-table">
+				<tr>
+					<th><label for="locg-enabled-input">Enable</label></th>
+					<td>
+						<input type="checkbox" id="locg-enabled-input">
+						<p>
+							Sources the New Releases page from
+							<a href="https://leagueofcomicgeeks.com" target="_blank" rel="noopener">leagueofcomicgeeks.com</a>,
+							which has more accurate weekly release dates than ComicVine.
+							The site has no public API, so requests use TLS fingerprint
+							impersonation to clear Cloudflare. Caching is aggressive
+							(30 days for past weeks, 24h current, 12h future) and
+							requests are throttled to one per 30 seconds per
+							<code>robots.txt</code>. Off by default — opt in if you
+							want this data and accept the third-party scraping
+							dependency.
+						</p>
+					</td>
+				</tr>
+			</table>
 		</form>
 	</div>
 </main>

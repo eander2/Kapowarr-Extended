@@ -26,6 +26,7 @@ Featured on [Noted](https://noted.lol/kapowarr/) and [Respectlytics](https://res
 - Downloaded files automatically get moved wherever you want and renamed in the format you desire
 - Archive files can be extracted and their contents renamed after downloading or with a single click
 - The recognisable UI from the *arr suite of software
+- Optional **New Releases** page sourced from [League of Comic Geeks](https://leagueofcomicgeeks.com) (off by default; opt in under Settings → Metadata). LOCG provides more accurate weekly release dates than ComicVine's cover-date metadata, but has no public API — Kapowarr uses TLS-fingerprint impersonation to clear Cloudflare and honours their `robots.txt` `Crawl-delay: 30`. Aggressive caching minimises traffic; if LOCG markup or anti-bot protection changes, this feature may stop working until updated.
 
 ## Installation, support and documentation
 

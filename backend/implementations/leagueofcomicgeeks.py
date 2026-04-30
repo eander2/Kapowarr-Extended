@@ -86,7 +86,12 @@ class _PersistentCache:
             f.write(json_dumps(self._data))
         os_replace(tmp_path, self._file_path)
 
-    def get(
+    def get_entry(
+        self, key: str
+    ) -> Optional[Dict[str, Any]]:
+        return self._data.get(key)
+
+    def get_fresh(
         self, key: str, max_age_seconds: int
     ) -> Optional[List[Dict[str, Any]]]:
         entry = self._data.get(key)
@@ -95,10 +100,6 @@ class _PersistentCache:
         if now_time() - entry['ts'] > max_age_seconds:
             return None
         return entry['value']
-
-    def get_stale(self, key: str) -> Optional[List[Dict[str, Any]]]:
-        entry = self._data.get(key)
-        return entry['value'] if entry else None
 
     def set(self, key: str, value: List[Dict[str, Any]]) -> None:
         self._data[key] = {'ts': now_time(), 'value': value}
@@ -251,7 +252,7 @@ class LeagueOfComicGeeks:
         week_date: str,
         publishers: Optional[List[str]] = None,
         include_variants: bool = False,
-    ) -> List[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """Fetch issues releasing in the week containing ``week_date``.
 
         Args:
@@ -267,11 +268,17 @@ class LeagueOfComicGeeks:
                 and add noise without distinct release information.
 
         Returns:
-            List[Dict[str, Any]]: Issue records with keys ``locg_id``,
-                ``title``, ``issue_number``, ``publisher``,
-                ``release_date`` (YYYY-MM-DD), ``cover``, ``url``,
-                ``price``, ``pulls``, ``is_variant``. Empty list on
-                persistent failure with no stale cache available.
+            Dict[str, Any]: ``{'releases': [...], 'stale': bool,
+                'fetched_at': int (Unix timestamp)}``. Each release has
+                keys ``locg_id``, ``title``, ``issue_number``,
+                ``publisher``, ``release_date`` (YYYY-MM-DD), ``cover``,
+                ``url``, ``price``, ``pulls``, ``is_variant``.
+
+                ``stale=True`` when the result came from cache after a
+                live-fetch failure or when the cached entry is older
+                than its TTL but a fetch couldn't refresh it. ``releases``
+                is empty when no cache entry exists and the live fetch
+                failed.
         """
         cache_key = (
             f'{week_date}|{",".join(publishers or [])}|v={int(include_variants)}'
@@ -279,12 +286,17 @@ class LeagueOfComicGeeks:
         cache = _get_cache()
         ttl = _ttl_for(week_date)
 
-        cached = cache.get(cache_key, ttl)
-        if cached is not None:
+        fresh = cache.get_fresh(cache_key, ttl)
+        if fresh is not None:
+            entry = cache.get_entry(cache_key)
             LOGGER.debug(
                 'LOCG cache hit for %s (ttl %ds)', cache_key, ttl
             )
-            return cached
+            return {
+                'releases': fresh,
+                'stale': False,
+                'fetched_at': int(entry['ts']) if entry else 0,
+            }
 
         params: Dict[str, Any] = {
             'list': 'releases',
@@ -312,35 +324,32 @@ class LeagueOfComicGeeks:
                 },
                 timeout=_REQUEST_TIMEOUT,
             )
-        except Exception as e:
-            LOGGER.warning(
-                'LOCG request failed (%s: %s) — falling back to stale cache',
-                type(e).__name__, e,
-            )
-            return cache.get_stale(cache_key) or []
-
-        if response.status_code != 200:
-            LOGGER.warning(
-                'LOCG returned HTTP %d for week %s — likely Cloudflare '
-                'block. Falling back to stale cache.',
-                response.status_code, week_date,
-            )
-            return cache.get_stale(cache_key) or []
-
-        try:
+            if response.status_code != 200:
+                raise RuntimeError(
+                    f'LOCG returned HTTP {response.status_code} (likely '
+                    f'Cloudflare block)'
+                )
             payload = response.json()
         except Exception as e:
             LOGGER.warning(
-                'LOCG response not JSON (%s); falling back to stale cache',
-                type(e).__name__,
+                'LOCG fetch for week %s failed (%s: %s) — falling back '
+                'to stale cache if available',
+                week_date, type(e).__name__, e,
             )
-            return cache.get_stale(cache_key) or []
+            stale_entry = cache.get_entry(cache_key)
+            if stale_entry:
+                return {
+                    'releases': stale_entry['value'],
+                    'stale': True,
+                    'fetched_at': int(stale_entry['ts']),
+                }
+            return {'releases': [], 'stale': False, 'fetched_at': 0}
 
         results = _parse_list_html(
             payload.get('list', ''), include_variants=include_variants
         )
-
         cache.set(cache_key, results)
+
         LOGGER.info(
             'LOCG fetched %d releases for week %s '
             '(LOCG normalised to %s, cached for %ds)',
@@ -348,4 +357,8 @@ class LeagueOfComicGeeks:
             payload.get('configurator', {}).get('date', week_date),
             ttl,
         )
-        return results
+        return {
+            'releases': results,
+            'stale': False,
+            'fetched_at': int(now_time()),
+        }

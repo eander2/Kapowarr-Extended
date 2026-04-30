@@ -37,16 +37,31 @@ function formatReleaseDate(iso) {
 
 let currentMonday = getMonday(new Date());
 let allReleases = [];
+let lastResponseMeta = { stale: false, fetched_at: 0, disabled: false };
 
 const cardTemplate = document.querySelector('.pre-build-els .release-card');
 const grid = document.querySelector('#releases-grid');
 const loadingEl = document.querySelector('#loading-releases');
 const emptyEl = document.querySelector('#empty-releases');
 const noMatchEl = document.querySelector('#no-match-releases');
+const disabledEl = document.querySelector('#disabled-releases');
+const staleBanner = document.querySelector('#stale-banner');
+const staleFetchedAt = document.querySelector('#stale-fetched-at');
 const metaEl = document.querySelector('#releases-meta');
 const weekLabel = document.querySelector('#week-label');
 const inLibraryToggle = document.querySelector('#in-library-only');
 const publisherFilter = document.querySelector('#publisher-filter');
+
+document.querySelector('#locg-settings-link').href = `${url_base}/settings/metadata`;
+
+function formatRelativeTime(unixTs) {
+	if (!unixTs) return 'unknown';
+	const d = new Date(unixTs * 1000);
+	return d.toLocaleString('en-US', {
+		month: 'short', day: 'numeric',
+		hour: 'numeric', minute: '2-digit'
+	});
+};
 
 function createCard(release, api_key) {
 	const card = cardTemplate.cloneNode(true);
@@ -123,6 +138,21 @@ function rebuildPublisherFilter(releases) {
 function renderReleases() {
 	grid.innerHTML = '';
 
+	if (lastResponseMeta.disabled) {
+		hide(
+			[loadingEl, grid, emptyEl, noMatchEl, metaEl, staleBanner],
+			[disabledEl]
+		);
+		return;
+	}
+
+	if (lastResponseMeta.stale) {
+		staleFetchedAt.textContent = formatRelativeTime(lastResponseMeta.fetched_at);
+		staleBanner.classList.remove('hidden');
+	} else {
+		staleBanner.classList.add('hidden');
+	}
+
 	const inLibOnly = inLibraryToggle.checked;
 	const pubFilter = publisherFilter.value;
 
@@ -133,15 +163,15 @@ function renderReleases() {
 	});
 
 	if (allReleases.length === 0) {
-		hide([loadingEl, grid, noMatchEl, metaEl], [emptyEl]);
+		hide([loadingEl, grid, noMatchEl, metaEl, disabledEl], [emptyEl]);
 		return;
 	}
 	if (filtered.length === 0) {
-		hide([loadingEl, grid, emptyEl, metaEl], [noMatchEl]);
+		hide([loadingEl, grid, emptyEl, metaEl, disabledEl], [noMatchEl]);
 		return;
 	}
 
-	hide([loadingEl, emptyEl, noMatchEl], [grid, metaEl]);
+	hide([loadingEl, emptyEl, noMatchEl, disabledEl], [grid, metaEl]);
 
 	const api_key = getLocalStorage('api_key').api_key;
 	filtered.forEach(r => grid.appendChild(createCard(r, api_key)));
@@ -153,7 +183,10 @@ function renderReleases() {
 };
 
 function loadWeek() {
-	hide([grid, emptyEl, noMatchEl, metaEl], [loadingEl]);
+	hide(
+		[grid, emptyEl, noMatchEl, metaEl, disabledEl, staleBanner],
+		[loadingEl]
+	);
 	weekLabel.textContent = formatWeekLabel(currentMonday);
 
 	const week = formatDate(currentMonday);
@@ -161,13 +194,20 @@ function loadWeek() {
 	usingApiKey()
 	.then(api_key => fetchAPI('/new-releases', api_key, { week: week }))
 	.then(json => {
-		allReleases = json.result || [];
+		const result = json.result || {};
+		allReleases = result.releases || [];
+		lastResponseMeta = {
+			stale: !!result.stale,
+			fetched_at: result.fetched_at || 0,
+			disabled: !!result.disabled,
+		};
 		rebuildPublisherFilter(allReleases);
 		renderReleases();
 	})
 	.catch(e => {
 		console.error('Failed to load new releases:', e);
 		allReleases = [];
+		lastResponseMeta = { stale: false, fetched_at: 0, disabled: false };
 		rebuildPublisherFilter(allReleases);
 		renderReleases();
 	});

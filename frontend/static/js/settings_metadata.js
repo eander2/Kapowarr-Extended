@@ -2,13 +2,16 @@ function fillSettings(api_key) {
 	fetchAPI('/settings', api_key)
 	.then(json => {
 		document.querySelector('#date-type-input').value = json.result.date_type;
+		document.querySelector('#locg-enabled-input').checked =
+			!!json.result.locg_enabled;
 	});
 };
 
 function saveSettings(api_key) {
 	document.querySelector("#save-button p").innerText = 'Saving';
 	const data = {
-		'date_type': document.querySelector('#date-type-input').value
+		'date_type': document.querySelector('#date-type-input').value,
+		'locg_enabled': document.querySelector('#locg-enabled-input').checked
 	};
 	sendAPI('PUT', '/settings', api_key, {}, data)
 	.then(response => response.json())

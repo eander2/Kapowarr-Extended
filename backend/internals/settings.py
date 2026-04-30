@@ -125,6 +125,12 @@ class PublicSettingsValues:
 
     date_type: DateType = DateType.COVER_DATE
 
+    # League of Comic Geeks integration. Off by default — opt-in because
+    # the underlying request goes through Cloudflare's bot challenge using
+    # TLS-fingerprint impersonation, and LOCG has no public API. The
+    # crawl-delay of 30s and aggressive caching minimise traffic to LOCG.
+    locg_enabled: bool = False
+
     def todict(self, to_public: bool = True) -> Dict[str, Any]:
         """Convert the dataclass to a dictionary.
 
