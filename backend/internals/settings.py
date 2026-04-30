@@ -130,6 +130,11 @@ class PublicSettingsValues:
     # TLS-fingerprint impersonation, and LOCG has no public API. The
     # crawl-delay of 30s and aggressive caching minimise traffic to LOCG.
     locg_enabled: bool = False
+    # Minimum seconds between outbound LOCG requests. Defaults to 30 per
+    # LOCG's robots.txt Crawl-delay; values below 1 are rejected (any rate
+    # faster than 1 req/sec is irresponsible toward a third-party site
+    # with no public API).
+    locg_crawl_delay_seconds: int = 30
 
     def todict(self, to_public: bool = True) -> Dict[str, Any]:
         """Convert the dataclass to a dictionary.
@@ -489,6 +494,9 @@ class Settings(metaclass=Singleton):
             raise InvalidKeyValue(key, value)
 
         elif key == 'failing_download_timeout' and value < 0:
+            raise InvalidKeyValue(key, value)
+
+        elif key == 'locg_crawl_delay_seconds' and value < 1:
             raise InvalidKeyValue(key, value)
 
         elif key == 'volume_padding' and not 1 <= value <= 3:

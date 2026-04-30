@@ -47,8 +47,12 @@ _RELEASES_URL = f'{_LOCG_BASE}/comic/get_comics'
 _REFERER = f'{_LOCG_BASE}/comics/new-comics'
 _CACHE_FILE_NAME = 'locg_cache.json'
 
-# robots.txt Crawl-delay = 30s. Hard cap on outbound request frequency.
-_CRAWL_DELAY_SECONDS = 30
+# robots.txt Crawl-delay = 30s. The user can override this via the
+# ``locg_crawl_delay_seconds`` setting, but never below the floor — going
+# faster than 1 req/sec against a third-party site with no public API is
+# irresponsible regardless of opt-in.
+_CRAWL_DELAY_FLOOR_SECONDS = 1
+_CRAWL_DELAY_DEFAULT_SECONDS = 30
 
 # Aggressive cache TTLs to minimise outbound traffic to LOCG.
 _TTL_PAST_WEEK = 30 * 86400         # 30 days  — closed weeks rarely change
@@ -119,12 +123,34 @@ def _get_cache() -> _PersistentCache:
     return _cache
 
 
+def _configured_crawl_delay() -> int:
+    """Read the user-configured crawl delay, clamped to the floor.
+
+    The floor is enforced even if the setting somehow holds a sub-floor
+    value (manual DB edit, schema mismatch) — defense in depth so we
+    never hammer LOCG faster than 1 req/sec.
+    """
+    try:
+        from backend.internals.settings import Settings
+        configured = int(getattr(
+            Settings().get_settings(),
+            'locg_crawl_delay_seconds',
+            _CRAWL_DELAY_DEFAULT_SECONDS,
+        ))
+    except Exception:
+        configured = _CRAWL_DELAY_DEFAULT_SECONDS
+    return max(_CRAWL_DELAY_FLOOR_SECONDS, configured)
+
+
 def _respect_crawl_delay() -> None:
     global _last_request_at
+    delay = _configured_crawl_delay()
     elapsed = now_time() - _last_request_at
-    if elapsed < _CRAWL_DELAY_SECONDS:
-        wait = _CRAWL_DELAY_SECONDS - elapsed
-        LOGGER.debug('LOCG crawl-delay sleeping %.1fs', wait)
+    if elapsed < delay:
+        wait = delay - elapsed
+        LOGGER.debug(
+            'LOCG crawl-delay sleeping %.1fs (configured %ds)', wait, delay
+        )
         sleep(wait)
     _last_request_at = now_time()
 

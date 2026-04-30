@@ -43,11 +43,23 @@
 							which has more accurate weekly release dates than ComicVine.
 							The site has no public API, so requests use TLS fingerprint
 							impersonation to clear Cloudflare. Caching is aggressive
-							(30 days for past weeks, 24h current, 12h future) and
-							requests are throttled to one per 30 seconds per
-							<code>robots.txt</code>. Off by default — opt in if you
-							want this data and accept the third-party scraping
-							dependency.
+							(30 days for past weeks, 24h current, 12h future). Off by
+							default — opt in if you want this data and accept the
+							third-party scraping dependency.
+						</p>
+					</td>
+				</tr>
+				<tr>
+					<th><label for="locg-crawl-delay-input">Crawl Delay (seconds)</label></th>
+					<td>
+						<input type="number" id="locg-crawl-delay-input"
+							min="1" step="1" required>
+						<p>
+							Minimum seconds between outbound requests to LOCG. Their
+							<code>robots.txt</code> declares <code>Crawl-delay: 30</code>
+							which is the default and recommended value. Cannot be set
+							below 1 — going faster than 1 request per second against a
+							third-party scraping endpoint is irresponsible.
 						</p>
 					</td>
 				</tr>
