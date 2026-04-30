@@ -1,0 +1,223 @@
+/* New Releases — sourced from League of Comic Geeks */
+
+main > .releases-header {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 12px 20px;
+	background-color: var(--foreground-color);
+	border-bottom: 1px solid var(--border-color);
+	flex: none;
+	overflow: visible;
+}
+
+.releases-nav {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 12px;
+}
+
+.releases-nav h2 {
+	font-size: 1.05rem;
+	font-weight: 500;
+	color: var(--text-color);
+	min-width: 280px;
+	text-align: center;
+}
+
+.releases-nav button {
+	padding: 6px 14px;
+	border: 1px solid var(--border-color);
+	border-radius: 4px;
+	background-color: var(--foreground-color);
+	color: var(--text-color);
+	cursor: pointer;
+	font-size: 0.9rem;
+	font-weight: 500;
+}
+
+.releases-nav button:hover {
+	background-color: var(--hover-color);
+}
+
+#today-button {
+	background-color: var(--accent-color);
+	color: var(--header-color);
+	border-color: var(--accent-color);
+}
+
+#today-button:hover {
+	opacity: 0.85;
+}
+
+.releases-filters {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 18px;
+	font-size: 0.85rem;
+}
+
+.filter-toggle {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+	color: var(--text-color);
+}
+
+#publisher-filter {
+	padding: 4px 8px;
+	border: 1px solid var(--border-color);
+	border-radius: 4px;
+	background-color: var(--foreground-color);
+	color: var(--text-color);
+	font-size: 0.85rem;
+	min-width: 180px;
+}
+
+.releases-empty-msg {
+	text-align: center;
+	padding: 30px 16px;
+	color: var(--dimmed-text-color);
+	font-size: 0.95rem;
+	line-height: 1.5;
+}
+
+#releases-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+	gap: 12px;
+	padding: 16px;
+}
+
+.release-card {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 8px;
+	border-radius: 6px;
+	border: 1px solid var(--border-color);
+	background-color: var(--foreground-color);
+	text-decoration: none;
+	color: var(--text-color);
+	transition: background-color 0.15s, transform 0.15s;
+}
+
+.release-card:hover {
+	background-color: var(--hover-color);
+	transform: translateY(-2px);
+}
+
+.release-card.in-library {
+	border-left: 4px solid var(--success-color);
+}
+
+.release-card.in-library.monitored {
+	border-left: 4px solid var(--accent-color);
+}
+
+.release-card-cover-wrap {
+	position: relative;
+	width: 100%;
+}
+
+.release-card-cover {
+	width: 100%;
+	height: auto;
+	max-height: 240px;
+	object-fit: contain;
+	border-radius: 3px;
+	background-color: var(--background-color);
+}
+
+.release-card-pulls {
+	position: absolute;
+	top: 4px;
+	right: 4px;
+	padding: 2px 6px;
+	border-radius: 3px;
+	background-color: rgba(0, 0, 0, 0.7);
+	color: var(--light-color);
+	font-size: 0.7rem;
+	font-weight: 600;
+}
+
+.release-card-info {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	overflow: hidden;
+}
+
+.release-card-title {
+	font-size: 0.85rem;
+	font-weight: 500;
+	white-space: normal;
+	-webkit-line-clamp: 2;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.release-card-meta {
+	font-size: 0.75rem;
+	color: var(--dimmed-text-color);
+	display: flex;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+.release-card-meta .price {
+	color: var(--text-color);
+	font-weight: 500;
+}
+
+.release-card-pub {
+	font-size: 0.7rem;
+	color: var(--dimmed-text-color);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.releases-meta {
+	text-align: center;
+	padding: 8px 16px 16px;
+	color: var(--dimmed-text-color);
+	font-size: 0.75rem;
+}
+
+@media (max-width: 768px) {
+	.releases-header {
+		padding: 8px 10px;
+	}
+
+	.releases-nav {
+		gap: 6px;
+	}
+
+	.releases-nav h2 {
+		font-size: 0.85rem;
+		min-width: auto;
+		flex: 1;
+	}
+
+	.releases-nav button {
+		padding: 4px 8px;
+		font-size: 0.75rem;
+	}
+
+	.releases-filters {
+		flex-wrap: wrap;
+		gap: 10px;
+		font-size: 0.8rem;
+	}
+
+	#releases-grid {
+		grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+		gap: 8px;
+		padding: 10px;
+	}
+}

@@ -93,6 +93,15 @@
 					Calendar
 				</a>
 				<a
+					href="{{url_base}}/new-releases"
+					class="{% if request.path == '/new-releases' %}current-nav{% endif %}"
+				>
+					<svg aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="font-size: 14px;">
+						<path fill="currentColor" d="M256 0c17.7 0 32 14.3 32 32V49.7c87.8 13.9 156.4 82.5 170.3 170.3H476.7c17.7 0 32 14.3 32 32s-14.3 32-32 32H458.3c-13.9 87.8-82.5 156.4-170.3 170.3v18.3c0 17.7-14.3 32-32 32s-32-14.3-32-32V474.3c-87.8-13.9-156.4-82.5-170.3-170.3H35.3c-17.7 0-32-14.3-32-32s14.3-32 32-32H53.7c13.9-87.8 82.5-156.4 170.3-170.3V32c0-17.7 14.3-32 32-32zM112 256a144 144 0 1 0 288 0 144 144 0 1 0 -288 0zm144-64a64 64 0 1 1 0 128 64 64 0 1 1 0-128z"></path>
+					</svg>
+					New Releases
+				</a>
+				<a
 					href="{{url_base}}/publishers"
 					class="{% if request.path == '/publishers' %}current-nav{% endif %}"
 				>

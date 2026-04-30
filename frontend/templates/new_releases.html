@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}New Releases{% endblock %}
+{% block css %}
+	<link rel="stylesheet" href="{{ url_for('static', filename='css/new_releases.css') }}">
+{% endblock %}
+{% block js %}
+	<script src="{{ url_for('static', filename='js/new_releases.js') }}" defer></script>
+{% endblock %}
+
+{% block pre_build_els %}
+<a href="" class="release-card" aria-label="">
+	<div class="release-card-cover-wrap">
+		<img class="release-card-cover" src="" alt="" loading="lazy">
+		<span class="release-card-pulls" title="Pulls on League of Comic Geeks"></span>
+	</div>
+	<div class="release-card-info">
+		<p class="release-card-title"></p>
+		<p class="release-card-meta"></p>
+		<p class="release-card-pub"></p>
+	</div>
+</a>
+{% endblock %}
+
+{% block main %}
+<main>
+	<section class="releases-header" aria-label="Week navigation and filters">
+		<div class="releases-nav">
+			<button id="prev-week" title="Previous week">&lt;&lt;</button>
+			<button id="today-button" title="Current week">Today</button>
+			<h2 id="week-label"></h2>
+			<button id="next-week" title="Next week">&gt;&gt;</button>
+		</div>
+		<div class="releases-filters">
+			<label class="filter-toggle">
+				<input type="checkbox" id="in-library-only">
+				In library only
+			</label>
+			<select id="publisher-filter" aria-label="Filter by publisher">
+				<option value="">All publishers</option>
+			</select>
+		</div>
+	</section>
+	<div id="loading-releases" class="loading-screen">
+		<h2>Loading...</h2>
+	</div>
+	<p id="empty-releases" class="releases-empty-msg hidden">
+		No releases for this week.<br>
+		League of Comic Geeks data is sourced from retailers and the community,
+		so very-distant future weeks may be empty until solicitations land.
+	</p>
+	<p id="no-match-releases" class="releases-empty-msg hidden">
+		No releases match your filters.
+	</p>
+	<section id="releases-grid" class="hidden" aria-label="New releases grid"></section>
+	<p id="releases-meta" class="releases-meta hidden"></p>
+</main>
+{% endblock main %}

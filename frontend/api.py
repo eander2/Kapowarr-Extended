@@ -35,6 +35,7 @@ from backend.implementations.blocklist import (add_to_blocklist,
                                                get_blocklist_entry)
 from backend.implementations.comicvine import ComicVine
 from backend.implementations.conversion import preview_mass_convert
+from backend.implementations.leagueofcomicgeeks import LeagueOfComicGeeks
 from backend.implementations.converters import ConvertersManager
 from backend.implementations.credentials import Credentials
 from backend.implementations.external_clients import ExternalClients
@@ -49,6 +50,7 @@ from backend.implementations.volumes import (Issue, Library, Volume,
                                               get_comic_page, get_comic_pages,
                                               move_file_to_volume,
                                               rename_issue_file)
+from backend.internals.db import get_db
 from backend.internals.db_models import FilesDB
 from backend.internals.server import Server, StartTypeHandlers
 from backend.internals.settings import Settings, get_about_data
@@ -776,6 +778,197 @@ def api_get_calendar():
     library_issues.sort(key=lambda i: (i.get('date') or '', i.get('volume_title') or ''))
 
     return return_api(library_issues)
+
+
+# =====================
+# New Releases (League of Comic Geeks)
+# =====================
+
+
+def _normalize_for_match(s: str) -> str:
+    """Lowercase, strip non-alphanumerics, collapse whitespace.
+
+    Used to compare LOCG titles/issue numbers against library entries
+    where punctuation, capitalization, and stray whitespace differ.
+    """
+    from re import sub
+    if not s:
+        return ''
+    return sub(r'\s+', ' ', sub(r'[^\w]+', ' ', s.lower())).strip()
+
+
+def _build_library_issue_index():
+    """Map normalized (volume_title, issue_number) → list of library hits.
+
+    A list because the same normalized title can appear across multiple
+    volumes (re-launches, year-disambiguated series). Each hit carries the
+    issue's stored date so date-proximity can disambiguate relaunches.
+    """
+    from collections import defaultdict
+    cursor = get_db()
+    rows = cursor.execute("""
+        SELECT v.id AS volume_id, v.title AS volume_title, v.year,
+               v.publisher, i.id AS issue_id, i.issue_number, i.date,
+               i.monitored
+        FROM volumes v
+        LEFT JOIN issues i ON i.volume_id = v.id
+        WHERE i.id IS NOT NULL
+    """).fetchalldict()
+
+    index = defaultdict(list)
+    for r in rows:
+        key = (
+            _normalize_for_match(r['volume_title']),
+            _normalize_for_match(r['issue_number']),
+        )
+        index[key].append({
+            'volume_id': r['volume_id'],
+            'volume_title': r['volume_title'],
+            'year': r['year'],
+            'publisher': r['publisher'],
+            'issue_id': r['issue_id'],
+            'issue_date': r['date'],
+            'monitored': bool(r['monitored']),
+        })
+    return index
+
+
+# Library issue date and LOCG release date can differ by a few days (cover
+# date vs store date; community curation lag). Anything beyond this window
+# is treated as a different volume's same-numbered issue (typical relaunch
+# false-positive).
+_DATE_PROXIMITY_DAYS = 21
+
+
+def _dates_close(d1: str, d2: str) -> bool:
+    if not d1 or not d2:
+        return False
+    from datetime import datetime
+    try:
+        delta = abs(
+            (datetime.strptime(d1, '%Y-%m-%d')
+             - datetime.strptime(d2, '%Y-%m-%d')).days
+        )
+    except ValueError:
+        return False
+    return delta <= _DATE_PROXIMITY_DAYS
+
+
+def _match_release_to_library(release, index):
+    """Strict match on normalized (title, issue_number) + date proximity.
+
+    Title-only relaunches (e.g. multiple "Batman" volumes across years)
+    will share both normalized title and small issue numbers — the date
+    proximity check rules out the wrong volume's same-numbered issue.
+    """
+    key = (
+        _normalize_for_match(release.get('title', '')),
+        _normalize_for_match(release.get('issue_number', '')),
+    )
+    candidates = index.get(key, [])
+    if not candidates:
+        return None
+
+    release_date = release.get('release_date', '')
+    date_matches = [
+        c for c in candidates
+        if _dates_close(c['issue_date'], release_date)
+    ]
+
+    if len(date_matches) == 1:
+        return date_matches[0]
+    if len(date_matches) > 1:
+        # Same title + issue # + close date in multiple volumes — break
+        # by publisher.
+        by_publisher = [
+            c for c in date_matches
+            if c['publisher']
+            and _normalize_for_match(c['publisher'])
+            == _normalize_for_match(release.get('publisher', ''))
+        ]
+        if len(by_publisher) == 1:
+            return by_publisher[0]
+        LOGGER.debug(
+            'LOCG → library match ambiguous for %r #%s on %s '
+            '(%d date-near candidates: %s) — returning unmatched',
+            release.get('title'), release.get('issue_number'),
+            release_date, len(by_publisher) or len(date_matches),
+            [c['volume_id'] for c in (by_publisher or date_matches)],
+        )
+        return None
+
+    if candidates:
+        LOGGER.debug(
+            'LOCG → library: %r #%s exists locally but stored date(s) '
+            '%s are >%d days from LOCG release %s — likely a different '
+            'volume relaunch, returning unmatched',
+            release.get('title'), release.get('issue_number'),
+            [c['issue_date'] for c in candidates],
+            _DATE_PROXIMITY_DAYS, release_date,
+        )
+    return None
+
+
+@api.route('/new-releases', methods=['GET'])
+@error_handler
+@auth
+def api_get_new_releases():
+    from datetime import date, timedelta
+    from re import fullmatch
+
+    week = extract_key(request, 'week', check_existence=False)
+    if not week:
+        today = date.today()
+        week = (today - timedelta(days=today.weekday())).strftime('%Y-%m-%d')
+    if not fullmatch(r'\d{4}-\d{2}-\d{2}', week):
+        raise InvalidKeyValue('week', 'expected YYYY-MM-DD format')
+
+    include_variants = (
+        extract_key(request, 'include_variants', check_existence=False)
+        in ('1', 'true', 'True')
+    )
+
+    # LOCG accepts publisher filter as numeric IDs (extracted from the
+    # filters_publishers HTML in the response), not names. Until we map
+    # names→IDs, filtering happens client-side; the response is small
+    # (~40 main issues per week) so this is fine.
+    publisher_filter = extract_key(
+        request, 'publisher', check_existence=False
+    )
+
+    releases = []
+    try:
+        releases = LeagueOfComicGeeks().fetch_new_releases(
+            week, include_variants=include_variants
+        )
+    except KapowarrException as e:
+        LOGGER.warning(
+            'New releases: LOCG fetch failed (%s: %s) — '
+            'returning empty list',
+            type(e).__name__, e
+        )
+
+    if publisher_filter:
+        norm_filter = _normalize_for_match(publisher_filter)
+        releases = [
+            r for r in releases
+            if _normalize_for_match(r.get('publisher', '')) == norm_filter
+        ]
+
+    index = _build_library_issue_index()
+    for release in releases:
+        match = _match_release_to_library(release, index)
+        release['in_library'] = match is not None
+        release['volume_id'] = match['volume_id'] if match else None
+        release['issue_id'] = match['issue_id'] if match else None
+        release['monitored'] = match['monitored'] if match else False
+
+    # Sort: in-library first, then by popularity (pulls).
+    releases.sort(
+        key=lambda r: (not r.get('in_library'), -(r.get('pulls') or 0))
+    )
+
+    return return_api(releases)
 
 
 # =====================

@@ -76,6 +76,11 @@ def ui_calendar():
     return render('calendar.html')
 
 
+@ui.route('/new-releases', methods=methods)
+def ui_new_releases():
+    return render('new_releases.html')
+
+
 @ui.route('/publishers', methods=methods)
 def ui_publishers():
     return render('publishers.html')
